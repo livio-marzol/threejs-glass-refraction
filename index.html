@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Three.js - Vidro com Refração & Aberração Cromática</title>
+  <title>Three.js - Shader Playground (Vidro, Iridescência & Mercúrio Líquido)</title>
   <link rel="stylesheet" href="./css/style.css" />
 
-  <!-- Import Map para resolução moderna de módulos Three.js e lil-gui via CDN -->
+  <!-- Import Map para Three.js e lil-gui via CDN -->
   <script type="importmap">
     {
       "imports": {
@@ -22,17 +22,17 @@
 
   <!-- HUD informativo e elegante -->
   <header class="hud-overlay">
-    <div class="hud-badge">Three.js Custom ShaderMaterial</div>
-    <h1 class="hud-title">Vidro Refrativo & Aberração Cromática</h1>
+    <div class="hud-badge">Shader Playground • GLSL</div>
+    <h1 class="hud-title">Vidro, Iridescência & Mercúrio Líquido</h1>
     <p class="hud-desc">
-      Renderização Multi-Pass com FBO, refração vetorial, RGB Split por canal de onda,
-      Fresnel e realces especulares com zoom cinemático ultra-suave.
+      Alterne entre 3 shaders avançados: refração de vidro com RGB Split,
+      interferência de bolha de sabão e mercúrio líquido cromado com deformação de vértices.
     </p>
     <div class="hud-instructions">
       <span>🖱️ <strong>Girar:</strong> Botão esquerdo</span>
       <span>🔍 <strong>Zoom Suave:</strong> Scroll / Trackpad</span>
       <span>🖐️ <strong>Pan:</strong> Botão direito</span>
-      <span>⚙️ <strong>Controles:</strong> Menu lateral</span>
+      <span>⚙️ <strong>Shaders:</strong> Menu lateral</span>
     </div>
   </header>
 

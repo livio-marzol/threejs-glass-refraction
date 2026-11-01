@@ -89,9 +89,9 @@ html, body {
 
 /* lil-gui custom styling */
 .lil-gui {
-  --background-color: rgba(13, 17, 23, 0.85) !important;
+  --background-color: rgba(13, 17, 23, 0.88) !important;
   --text-color: #f1f5f9 !important;
-  --title-background-color: rgba(30, 41, 59, 0.9) !important;
+  --title-background-color: rgba(30, 41, 59, 0.95) !important;
   --widget-color: rgba(51, 65, 85, 0.8) !important;
   --hover-color: rgba(71, 85, 105, 0.9) !important;
   --focus-color: #38bdf8 !important;
