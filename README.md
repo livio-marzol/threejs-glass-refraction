@@ -2,9 +2,6 @@
 
 > Um experimento visual interativo explorando o poder dos **Custom Shaders (GLSL)** e renderização em tempo real com **Three.js**.
 
-![Demonstração do Projeto](https://raw.githubusercontent.com/SEU_USUARIO/SEU_REPOSITORIO/main/preview.png)
-*(Dica: você pode colocar uma screenshot ou gif aqui depois!)*
-
 ---
 
 ## 🎯 Sobre o Projeto
