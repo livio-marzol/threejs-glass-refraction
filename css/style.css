@@ -1,124 +1,154 @@
 * {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
-html, body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background-color: #050508;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  color: #f1f5f9;
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #050508;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #e2e8f0;
 }
 
 #canvas-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
 }
 
-/* Painel de HUD / UI */
-.hud-overlay {
-  position: absolute;
-  top: 24px;
-  left: 24px;
-  z-index: 10;
-  max-width: 440px;
-  pointer-events: none;
-  background: rgba(13, 17, 23, 0.65);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  padding: 20px 24px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition: opacity 0.3s ease;
+#hud-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 24px;
 }
 
-.hud-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #38bdf8;
-  background: rgba(56, 189, 248, 0.15);
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  border-radius: 9999px;
-  margin-bottom: 10px;
+.hud-card {
+    pointer-events: auto;
+    max-width: 380px;
+    background: rgba(13, 16, 26, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.hud-card:hover {
+    border-color: rgba(0, 243, 255, 0.35);
+}
+
+.hud-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #00f3ff;
+    box-shadow: 0 0 10px #00f3ff;
+    animation: pulseGlow 2s infinite ease-in-out;
+}
+
+@keyframes pulseGlow {
+    0%, 100% { opacity: 0.5; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1.15); }
 }
 
 .hud-title {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.3;
-  margin-bottom: 8px;
-  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #94a3b8;
+    text-transform: uppercase;
+}
+
+.hud-shader-name {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: #ffffff;
+    margin-bottom: 8px;
+    text-shadow: 0 0 20px rgba(0, 243, 255, 0.3);
 }
 
 .hud-desc {
-  font-size: 13px;
-  line-height: 1.5;
-  color: #94a3b8;
-  margin-bottom: 14px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #cbd5e1;
+    margin-bottom: 16px;
 }
 
-.hud-instructions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  font-size: 11.5px;
-  color: #cbd5e1;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 12px;
+.hud-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
 }
 
-.hud-instructions span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+.hud-tag {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 4px 10px;
+    border-radius: 20px;
+    color: #38bdf8;
 }
 
-/* lil-gui custom styling */
+.hud-hint {
+    pointer-events: none;
+    font-size: 12px;
+    color: #64748b;
+    background: rgba(10, 12, 18, 0.6);
+    backdrop-filter: blur(8px);
+    padding: 8px 16px;
+    border-radius: 24px;
+    align-self: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
 .lil-gui {
-  --background-color: rgba(13, 17, 23, 0.88) !important;
-  --text-color: #f1f5f9 !important;
-  --title-background-color: rgba(30, 41, 59, 0.95) !important;
-  --widget-color: rgba(51, 65, 85, 0.8) !important;
-  --hover-color: rgba(71, 85, 105, 0.9) !important;
-  --focus-color: #38bdf8 !important;
-  --number-color: #38bdf8 !important;
-  --string-color: #a78bfa !important;
-  font-family: inherit !important;
-  border-radius: 12px !important;
-  overflow: hidden !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  margin: 24px !important;
+    --background-color: rgba(13, 16, 26, 0.85) !important;
+    --text-color: #e2e8f0 !important;
+    --title-background-color: rgba(20, 24, 38, 0.95) !important;
+    --widget-color: rgba(30, 38, 58, 0.9) !important;
+    --hover-color: rgba(0, 243, 255, 0.25) !important;
+    --focus-color: #00f3ff !important;
+    --number-color: #00f3ff !important;
+    --string-color: #38bdf8 !important;
+    font-family: inherit !important;
+    border-radius: 14px !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(20px) !important;
+    margin-top: 24px !important;
+    margin-right: 24px !important;
 }
 
-@media (max-width: 640px) {
-  .hud-overlay {
-    top: 12px;
-    left: 12px;
-    right: 12px;
-    max-width: none;
-    padding: 14px 16px;
-  }
-  .hud-title {
-    font-size: 17px;
-  }
-  .hud-desc {
-    display: none;
-  }
+.lil-gui .title {
+    font-weight: 700 !important;
+    letter-spacing: 0.5px !important;
 }

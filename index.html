@@ -1,41 +1,47 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Three.js - Shader Playground (Vidro, Iridescência & Mercúrio Líquido)</title>
-  <link rel="stylesheet" href="./css/style.css" />
-
-  <!-- Import Map para Three.js e lil-gui via CDN -->
-  <script type="importmap">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Shader Playground - Buraco Negro & Lente Gravitacional</title>
+    <link rel="stylesheet" href="css/style.css">
+    
+    <script type="importmap">
     {
-      "imports": {
-        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-        "lil-gui": "https://unpkg.com/lil-gui@0.19.1/dist/lil-gui.esm.min.js"
-      }
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+            "lil-gui": "https://unpkg.com/lil-gui@0.19.1/dist/lil-gui.esm.min.js"
+        }
     }
-  </script>
+    </script>
 </head>
 <body>
-  <div id="canvas-container"></div>
+    <div id="canvas-container"></div>
 
-  <!-- HUD informativo e elegante -->
-  <header class="hud-overlay">
-    <div class="hud-badge">Shader Playground • GLSL</div>
-    <h1 class="hud-title">Vidro, Iridescência & Mercúrio Líquido</h1>
-    <p class="hud-desc">
-      Alterne entre 3 shaders avançados: refração de vidro com RGB Split,
-      interferência de bolha de sabão e mercúrio líquido cromado com deformação de vértices.
-    </p>
-    <div class="hud-instructions">
-      <span>🖱️ <strong>Girar:</strong> Botão esquerdo</span>
-      <span>🔍 <strong>Zoom Suave:</strong> Scroll / Trackpad</span>
-      <span>🖐️ <strong>Pan:</strong> Botão direito</span>
-      <span>⚙️ <strong>Shaders:</strong> Menu lateral</span>
+    <!-- HUD Glassmorphism -->
+    <div id="hud-overlay">
+        <div class="hud-card">
+            <div class="hud-header">
+                <span class="status-indicator"></span>
+                <span class="hud-title">SHADER PLAYGROUND</span>
+            </div>
+            <div class="hud-shader-name" id="hud-active-shader">Buraco Negro (Lensing)</div>
+            <p class="hud-desc" id="hud-description">
+                Lente gravitacional einsteiniana contínua com horizonte de Schwarzschild, disco de acreção 3D com rotação Kepleriana, efeito Doppler relativístico e duplo arco de auréola.
+            </p>
+            <div class="hud-tags">
+                <span class="hud-tag">Multi-Pass FBO</span>
+                <span class="hud-tag">DPI Aligned</span>
+                <span class="hud-tag">Zero Asset</span>
+                <span class="hud-tag">Cinematic Zoom</span>
+            </div>
+        </div>
+        <div class="hud-hint">
+            <span>🖱️ Arraste para orbitar | Scroll para zoom cinemático | lil-gui para alternar shaders</span>
+        </div>
     </div>
-  </header>
 
-  <script type="module" src="./js/main.js"></script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>

@@ -1,1168 +1,1259 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Setup script para atualização do Three.js Shader Playground:
-Correção de compilação GLSL no Vertex Shader do 'Mercúrio Líquido Cromado'.
-"""
-
 import os
 from pathlib import Path
 
-FILES = {
-    # -------------------------------------------------------------
-    # 1. index.html
-    # -------------------------------------------------------------
-    "index.html": """<!DOCTYPE html>
+FILES = {}
+
+# ==============================================================================
+# 1. index.html
+# ==============================================================================
+FILES["index.html"] = """<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Three.js - Shader Playground (Vidro, Iridescência & Mercúrio Líquido)</title>
-  <link rel="stylesheet" href="./css/style.css" />
-
-  <!-- Import Map para Three.js e lil-gui via CDN -->
-  <script type="importmap">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Shader Playground - Buraco Negro & Lente Gravitacional</title>
+    <link rel="stylesheet" href="css/style.css">
+    
+    <script type="importmap">
     {
-      "imports": {
-        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-        "lil-gui": "https://unpkg.com/lil-gui@0.19.1/dist/lil-gui.esm.min.js"
-      }
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+            "lil-gui": "https://unpkg.com/lil-gui@0.19.1/dist/lil-gui.esm.min.js"
+        }
     }
-  </script>
+    </script>
 </head>
 <body>
-  <div id="canvas-container"></div>
+    <div id="canvas-container"></div>
 
-  <!-- HUD informativo e elegante -->
-  <header class="hud-overlay">
-    <div class="hud-badge">Shader Playground • GLSL</div>
-    <h1 class="hud-title">Vidro, Iridescência & Mercúrio Líquido</h1>
-    <p class="hud-desc">
-      Alterne entre 3 shaders avançados: refração de vidro com RGB Split,
-      interferência de bolha de sabão e mercúrio líquido cromado com deformação de vértices.
-    </p>
-    <div class="hud-instructions">
-      <span>🖱️ <strong>Girar:</strong> Botão esquerdo</span>
-      <span>🔍 <strong>Zoom Suave:</strong> Scroll / Trackpad</span>
-      <span>🖐️ <strong>Pan:</strong> Botão direito</span>
-      <span>⚙️ <strong>Shaders:</strong> Menu lateral</span>
+    <!-- HUD Glassmorphism -->
+    <div id="hud-overlay">
+        <div class="hud-card">
+            <div class="hud-header">
+                <span class="status-indicator"></span>
+                <span class="hud-title">SHADER PLAYGROUND</span>
+            </div>
+            <div class="hud-shader-name" id="hud-active-shader">Buraco Negro (Lensing)</div>
+            <p class="hud-desc" id="hud-description">
+                Lente gravitacional einsteiniana contínua com horizonte de Schwarzschild, disco de acreção 3D com rotação Kepleriana, efeito Doppler relativístico e duplo arco de auréola.
+            </p>
+            <div class="hud-tags">
+                <span class="hud-tag">Multi-Pass FBO</span>
+                <span class="hud-tag">DPI Aligned</span>
+                <span class="hud-tag">Zero Asset</span>
+                <span class="hud-tag">Cinematic Zoom</span>
+            </div>
+        </div>
+        <div class="hud-hint">
+            <span>🖱️ Arraste para orbitar | Scroll para zoom cinemático | lil-gui para alternar shaders</span>
+        </div>
     </div>
-  </header>
 
-  <script type="module" src="./js/main.js"></script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>
-""",
+"""
 
-    # -------------------------------------------------------------
-    # 2. css/style.css
-    # -------------------------------------------------------------
-    "css/style.css": """* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+# ==============================================================================
+# 2. css/style.css
+# ==============================================================================
+FILES["css/style.css"] = """* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
-html, body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background-color: #050508;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  color: #f1f5f9;
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #050508;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #e2e8f0;
 }
 
 #canvas-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
 }
 
-/* Painel de HUD / UI */
-.hud-overlay {
-  position: absolute;
-  top: 24px;
-  left: 24px;
-  z-index: 10;
-  max-width: 440px;
-  pointer-events: none;
-  background: rgba(13, 17, 23, 0.65);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  padding: 20px 24px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition: opacity 0.3s ease;
+#hud-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 24px;
 }
 
-.hud-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #38bdf8;
-  background: rgba(56, 189, 248, 0.15);
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  border-radius: 9999px;
-  margin-bottom: 10px;
+.hud-card {
+    pointer-events: auto;
+    max-width: 380px;
+    background: rgba(13, 16, 26, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.hud-card:hover {
+    border-color: rgba(0, 243, 255, 0.35);
+}
+
+.hud-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #00f3ff;
+    box-shadow: 0 0 10px #00f3ff;
+    animation: pulseGlow 2s infinite ease-in-out;
+}
+
+@keyframes pulseGlow {
+    0%, 100% { opacity: 0.5; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1.15); }
 }
 
 .hud-title {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.3;
-  margin-bottom: 8px;
-  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #94a3b8;
+    text-transform: uppercase;
+}
+
+.hud-shader-name {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: #ffffff;
+    margin-bottom: 8px;
+    text-shadow: 0 0 20px rgba(0, 243, 255, 0.3);
 }
 
 .hud-desc {
-  font-size: 13px;
-  line-height: 1.5;
-  color: #94a3b8;
-  margin-bottom: 14px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #cbd5e1;
+    margin-bottom: 16px;
 }
 
-.hud-instructions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  font-size: 11.5px;
-  color: #cbd5e1;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 12px;
+.hud-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
 }
 
-.hud-instructions span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
+.hud-tag {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 4px 10px;
+    border-radius: 20px;
+    color: #38bdf8;
 }
 
-/* lil-gui custom styling */
+.hud-hint {
+    pointer-events: none;
+    font-size: 12px;
+    color: #64748b;
+    background: rgba(10, 12, 18, 0.6);
+    backdrop-filter: blur(8px);
+    padding: 8px 16px;
+    border-radius: 24px;
+    align-self: center;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
 .lil-gui {
-  --background-color: rgba(13, 17, 23, 0.88) !important;
-  --text-color: #f1f5f9 !important;
-  --title-background-color: rgba(30, 41, 59, 0.95) !important;
-  --widget-color: rgba(51, 65, 85, 0.8) !important;
-  --hover-color: rgba(71, 85, 105, 0.9) !important;
-  --focus-color: #38bdf8 !important;
-  --number-color: #38bdf8 !important;
-  --string-color: #a78bfa !important;
-  font-family: inherit !important;
-  border-radius: 12px !important;
-  overflow: hidden !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  margin: 24px !important;
+    --background-color: rgba(13, 16, 26, 0.85) !important;
+    --text-color: #e2e8f0 !important;
+    --title-background-color: rgba(20, 24, 38, 0.95) !important;
+    --widget-color: rgba(30, 38, 58, 0.9) !important;
+    --hover-color: rgba(0, 243, 255, 0.25) !important;
+    --focus-color: #00f3ff !important;
+    --number-color: #00f3ff !important;
+    --string-color: #38bdf8 !important;
+    font-family: inherit !important;
+    border-radius: 14px !important;
+    overflow: hidden !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5) !important;
+    backdrop-filter: blur(20px) !important;
+    margin-top: 24px !important;
+    margin-right: 24px !important;
 }
 
-@media (max-width: 640px) {
-  .hud-overlay {
-    top: 12px;
-    left: 12px;
-    right: 12px;
-    max-width: none;
-    padding: 14px 16px;
-  }
-  .hud-title {
-    font-size: 17px;
-  }
-  .hud-desc {
-    display: none;
-  }
+.lil-gui .title {
+    font-weight: 700 !important;
+    letter-spacing: 0.5px !important;
 }
-""",
-
-    # -------------------------------------------------------------
-    # 3. js/shaders.js (Com correção no Simplex 3D Noise)
-    # -------------------------------------------------------------
-    "js/shaders.js": """/**
- * Repositório de Shaders GLSL:
- * 1. Vidro Refrativo (RGB Split)
- * 2. Película Iridescente (Thin-Film)
- * 3. Mercúrio Líquido Cromado (Vertex Displacement + Simplex 3D Noise)
- */
-
-// =================================================================
-// SHADER 1: VIDRO REFRATIVO (RGB SPLIT)
-// =================================================================
-
-export const glassVertexShader = /* glsl */ `
-  varying vec3 vWorldPosition;
-  varying vec3 vWorldNormal;
-  varying vec3 vViewNormal;
-  varying vec3 vViewPosition;
-
-  void main() {
-    vec4 worldPos = modelMatrix * vec4(position, 1.0);
-    vWorldPosition = worldPos.xyz;
-    vWorldNormal = normalize(mat3(modelMatrix) * normal);
-    vViewNormal = normalize(normalMatrix * normal);
-
-    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    vViewPosition = -mvPosition.xyz;
-
-    gl_Position = projectionMatrix * mvPosition;
-  }
-`;
-
-export const glassFragmentShader = /* glsl */ `
-  precision highp float;
-
-  uniform sampler2D uSceneTexture;
-  uniform vec2 uResolution;
-  uniform float uRefractPower;
-  uniform float uChromaticAberration;
-  uniform float uFresnelIntensity;
-  uniform float uFresnelPower;
-  uniform vec3 uFresnelColor;
-  uniform vec3 uLightPos;
-  uniform vec3 uSpecularColor;
-  uniform float uShininess;
-
-  varying vec3 vWorldPosition;
-  varying vec3 vWorldNormal;
-  varying vec3 vViewNormal;
-  varying vec3 vViewPosition;
-
-  void main() {
-    vec2 screenUV = gl_FragCoord.xy / uResolution.xy;
-
-    vec3 normal = normalize(vWorldNormal);
-    vec3 viewNormal = normalize(vViewNormal);
-    vec3 viewDir = normalize(cameraPosition - vWorldPosition);
-
-    vec2 distortion = viewNormal.xy * uRefractPower;
-
-    float rFactor = 1.0 + uChromaticAberration;
-    float gFactor = 1.0;
-    float bFactor = 1.0 - uChromaticAberration;
-
-    vec2 uvR = clamp(screenUV - distortion * rFactor, vec2(0.001), vec2(0.999));
-    vec2 uvG = clamp(screenUV - distortion * gFactor, vec2(0.001), vec2(0.999));
-    vec2 uvB = clamp(screenUV - distortion * bFactor, vec2(0.001), vec2(0.999));
-
-    float r = texture2D(uSceneTexture, uvR).r;
-    float g = texture2D(uSceneTexture, uvG).g;
-    float b = texture2D(uSceneTexture, uvB).b;
-    vec3 refractedColor = vec3(r, g, b);
-
-    float cosTheta = clamp(dot(viewDir, normal), 0.0, 1.0);
-    float fresnel = pow(1.0 - cosTheta, uFresnelPower) * uFresnelIntensity;
-
-    vec3 lightDir = normalize(uLightPos - vWorldPosition);
-    vec3 halfVec = normalize(lightDir + viewDir);
-    float NdotH = max(dot(normal, halfVec), 0.0);
-    float specular = pow(NdotH, uShininess);
-
-    float rimSpec = pow(max(dot(reflect(-lightDir, normal), -viewDir), 0.0), uShininess * 0.4) * 0.35;
-
-    vec3 finalColor = refractedColor;
-    finalColor += fresnel * uFresnelColor;
-    finalColor += (specular + rimSpec) * uSpecularColor;
-
-    gl_FragColor = vec4(finalColor, 1.0);
-  }
-`;
-
-// =================================================================
-// SHADER 2: PELÍCULA IRIDESCENTE / BOLHA DE SABÃO (THIN-FILM)
-// =================================================================
-
-export const iridescentVertexShader = /* glsl */ `
-  varying vec3 vWorldPosition;
-  varying vec3 vWorldNormal;
-  varying vec3 vViewNormal;
-
-  void main() {
-    vec4 worldPos = modelMatrix * vec4(position, 1.0);
-    vWorldPosition = worldPos.xyz;
-    vWorldNormal = normalize(mat3(modelMatrix) * normal);
-    vViewNormal = normalize(normalMatrix * normal);
-
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-export const iridescentFragmentShader = /* glsl */ `
-  precision highp float;
-
-  uniform sampler2D uSceneTexture;
-  uniform vec2 uResolution;
-  uniform float uTime;
-  uniform float uRefractPower;
-  uniform float uFrequency;
-  uniform float uNoiseScale;
-  uniform float uIridescenceIntensity;
-  uniform float uTransparency;
-  uniform float uFresnelPower;
-  uniform vec3 uLightPos;
-  uniform vec3 uSpecularColor;
-  uniform float uShininess;
-
-  varying vec3 vWorldPosition;
-  varying vec3 vWorldNormal;
-  varying vec3 vViewNormal;
-
-  vec3 spectralColor(float t) {
-    vec3 a = vec3(0.5, 0.5, 0.5);
-    vec3 b = vec3(0.5, 0.5, 0.5);
-    vec3 c = vec3(1.0, 1.0, 1.0);
-    vec3 d = vec3(0.00, 0.33, 0.67);
-    return a + b * cos(6.28318 * (c * t + d));
-  }
-
-  void main() {
-    vec2 screenUV = gl_FragCoord.xy / uResolution.xy;
-
-    vec3 normal = normalize(vWorldNormal);
-    vec3 viewNormal = normalize(vViewNormal);
-    vec3 viewDir = normalize(cameraPosition - vWorldPosition);
-
-    vec2 distortion = viewNormal.xy * uRefractPower;
-    vec3 bgColor = texture2D(uSceneTexture, clamp(screenUV - distortion, vec2(0.001), vec2(0.999))).rgb;
-
-    float cosTheta = clamp(dot(viewDir, normal), 0.0, 1.0);
-    float fresnel = pow(1.0 - cosTheta, uFresnelPower);
-
-    float wave = sin(vWorldPosition.x * 2.4 + uTime * 0.7) * cos(vWorldPosition.y * 2.4 + vWorldPosition.z * 1.6 + uTime * 0.5);
-    float filmCoord = (1.0 - cosTheta) * uFrequency + wave * uNoiseScale;
-    vec3 iridColor = spectralColor(filmCoord);
-
-    vec3 lightDir = normalize(uLightPos - vWorldPosition);
-    vec3 halfVec = normalize(lightDir + viewDir);
-    float NdotH = max(dot(normal, halfVec), 0.0);
-    float specular = pow(NdotH, uShininess);
-
-    float rimSpec = pow(max(dot(reflect(-lightDir, normal), -viewDir), 0.0), uShininess * 0.35) * 0.6;
-
-    float filmWeight = clamp(fresnel * uIridescenceIntensity + (1.0 - uTransparency), 0.0, 1.0);
-    vec3 finalColor = mix(bgColor, iridColor, filmWeight);
-
-    finalColor += (specular * uSpecularColor) + (rimSpec * iridColor * 0.75);
-
-    gl_FragColor = vec4(finalColor, 1.0);
-  }
-`;
-
-// =================================================================
-// SHADER 3: MERCÚRIO LÍQUIDO CROMADO (CORRIGIDO)
-// =================================================================
-
-export const liquidVertexShader = /* glsl */ `
-  uniform float uTime;
-  uniform float uWaveSpeed;
-  uniform float uDisplacementScale;
-  uniform float uNoiseFrequency;
-
-  varying vec3 vWorldPosition;
-  varying vec3 vWorldNormal;
-  varying vec3 vViewNormal;
-  varying vec3 vViewPosition;
-  varying float vDisplacement;
-
-  // Implementação correta e canônica de Simplex 3D Noise (Stefan Gustavson)
-  vec4 permute(vec4 x){ return mod(((x * 34.0) + 1.0) * x, 289.0); }
-  vec4 taylorInvSqrt(vec4 r){ return 1.79284291400159 - 0.85373472095314 * r; }
-
-  float snoise(vec3 v){
-    const vec2 C = vec2(1.0 / 6.0, 1.0 / 3.0);
-    const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
-
-    vec3 i  = floor(v + dot(v, C.yyy));
-    vec3 x0 = v - i + dot(i, C.xxx);
-
-    vec3 g = step(x0.yzx, x0.xyz);
-    vec3 l = 1.0 - g;
-    vec3 i1 = min(g.xyz, l.zxy);
-    vec3 i2 = max(g.xyz, l.zxy);
-
-    vec3 x1 = x0 - i1 + 1.0 * C.xxx;
-    vec3 x2 = x0 - i2 + 2.0 * C.xxx;
-    vec3 x3 = x0 - 1.0 + 3.0 * C.xxx;
-
-    i = mod(i, 289.0);
-    vec4 p = permute(permute(permute(
-              i.z + vec4(0.0, i1.z, i2.z, 1.0))
-            + i.y + vec4(0.0, i1.y, i2.y, 1.0))
-            + i.x + vec4(0.0, i1.x, i2.x, 1.0));
-
-    float n_ = 0.142857142857; // 1.0 / 7.0
-    vec3 ns = n_ * D.wyz - D.xzx;
-
-    // Correção: multiplicação escalar correta para mod(p, 49)
-    vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
-
-    vec4 x_ = floor(j * ns.z);
-    vec4 y_ = floor(j - 7.0 * x_);
-
-    vec4 x = x_ * ns.x + ns.yyyy;
-    vec4 y = y_ * ns.x + ns.yyyy;
-    vec4 h = 1.0 - abs(x) - abs(y);
-
-    vec4 b0 = vec4(x.xy, y.xy);
-    vec4 b1 = vec4(x.zw, y.zw);
-
-    vec4 s0 = floor(b0) * 2.0 + 1.0;
-    vec4 s1 = floor(b1) * 2.0 + 1.0;
-    vec4 sh = -step(h, vec4(0.0));
-
-    vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
-    vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
-
-    vec3 p0 = vec3(a0.xy, h.x);
-    vec3 p1 = vec3(a0.zw, h.y);
-    vec3 p2 = vec3(a1.xy, h.z);
-    vec3 p3 = vec3(a1.zw, h.w);
-
-    vec4 norm = taylorInvSqrt(vec4(dot(p0, p0), dot(p1, p1), dot(p2, p2), dot(p3, p3)));
-    p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
-
-    vec4 m = max(0.6 - vec4(dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3)), 0.0);
-    m = m * m;
-    return 42.0 * dot(m * m, vec4(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
-  }
-
-  // Deformação harmônica orgânica de metal líquido
-  float getDisplacement(vec3 p) {
-    float t = uTime * uWaveSpeed;
-    float n1 = snoise(p * uNoiseFrequency + vec3(0.0, 0.0, t * 0.5));
-    float n2 = snoise(p * uNoiseFrequency * 2.2 - vec3(t * 0.6, t * 0.4, 0.0)) * 0.45;
-    float n3 = snoise(p * uNoiseFrequency * 4.0 + vec3(0.0, t * 0.7, t * 0.3)) * 0.15;
-    return (n1 + n2 + n3) * uDisplacementScale;
-  }
-
-  void main() {
-    float disp = getDisplacement(position);
-    vDisplacement = disp;
-    vec3 displacedPos = position + normal * disp;
-
-    // Recálculo suave das normais por diferenças finitas em espaço tangente
-    float eps = 0.02;
-    vec3 tangent = normalize(abs(normal.y) < 0.99 ? cross(normal, vec3(0.0, 1.0, 0.0)) : cross(normal, vec3(0.0, 0.0, 1.0)));
-    vec3 bitangent = cross(normal, tangent);
-
-    vec3 p0 = position + normal * disp;
-    vec3 p1 = position + tangent * eps + normal * getDisplacement(position + tangent * eps);
-    vec3 p2 = position + bitangent * eps + normal * getDisplacement(position + bitangent * eps);
-
-    vec3 recalculatedNormal = normalize(cross(p1 - p0, p2 - p0));
-
-    vec4 worldPos = modelMatrix * vec4(displacedPos, 1.0);
-    vWorldPosition = worldPos.xyz;
-    vWorldNormal = normalize(mat3(modelMatrix) * recalculatedNormal);
-    vViewNormal = normalize(normalMatrix * recalculatedNormal);
-
-    vec4 mvPosition = modelViewMatrix * vec4(displacedPos, 1.0);
-    vViewPosition = -mvPosition.xyz;
-    gl_Position = projectionMatrix * mvPosition;
-  }
-`;
-
-export const liquidFragmentShader = /* glsl */ `
-  precision highp float;
-
-  uniform sampler2D uSceneTexture;
-  uniform vec2 uResolution;
-  uniform vec3 uMetalColor;
-  uniform float uReflectionIntensity;
-  uniform float uFresnelPower;
-  uniform float uRoughness;
-  uniform vec3 uLightPos;
-  uniform vec3 uSpecularColor;
-
-  varying vec3 vWorldPosition;
-  varying vec3 vWorldNormal;
-  varying vec3 vViewNormal;
-  varying vec3 vViewPosition;
-  varying float vDisplacement;
-
-  // Ambiente de estúdio cromado procedural (horizonte nítido de metal espelhado)
-  vec3 getChromeEnvironment(vec3 rayDir) {
-    float y = rayDir.y;
-    vec3 skyColor = vec3(0.90, 0.95, 1.0);
-    vec3 groundColor = vec3(0.08, 0.10, 0.15);
-    vec3 horizonGlow = vec3(0.4, 0.75, 1.0);
-
-    float horizon = smoothstep(-0.06, 0.06, y);
-    float horizonBand = exp(-abs(y) * 14.0);
-
-    vec3 env = mix(groundColor, skyColor, horizon);
-    env += horizonBand * horizonGlow * 1.3;
-
-    // Faixa neon sutil para adicionar dinamismo de estúdio 3D
-    float neonStrip = pow(max(dot(rayDir, normalize(vec3(0.8, 0.35, -0.5))), 0.0), 16.0);
-    env += neonStrip * vec3(1.0, 0.25, 0.65) * 1.6;
-
-    return env;
-  }
-
-  void main() {
-    vec3 normal = normalize(vWorldNormal);
-    vec3 viewDir = normalize(cameraPosition - vWorldPosition);
-    vec3 viewNormal = normalize(vViewNormal);
-
-    // 1. Vetor de reflexão no espaço do mundo
-    vec3 reflectDir = reflect(-viewDir, normal);
-
-    // 2. Reflexo do ambiente cromado
-    vec3 chromeEnv = getChromeEnvironment(reflectDir);
-
-    // 3. Reflexo da cena de fundo (espelhando os objetos coloridos do FBO)
-    vec2 screenUV = gl_FragCoord.xy / uResolution.xy;
-    vec2 reflectUV = screenUV + viewNormal.xy * 0.22;
-    vec3 sceneReflection = texture2D(uSceneTexture, clamp(reflectUV, vec2(0.001), vec2(0.999))).rgb;
-
-    // 4. Efeito Fresnel condutor para metais (Schlick aproximado para cromo/mercúrio)
-    float cosTheta = clamp(dot(viewDir, normal), 0.0, 1.0);
-    float fresnel = 0.68 + 0.32 * pow(1.0 - cosTheta, uFresnelPower);
-
-    // 5. Brilho Especular Blinn-Phong nítido
-    vec3 lightDir = normalize(uLightPos - vWorldPosition);
-    vec3 halfVec = normalize(lightDir + viewDir);
-    float NdotH = max(dot(normal, halfVec), 0.0);
-    float shininess = mix(128.0, 16.0, uRoughness);
-    float specular = pow(NdotH, shininess) * 1.6;
-    float secondarySpec = pow(NdotH, 20.0) * 0.45;
-
-    // 6. Fusão Metálica
-    vec3 combinedReflection = mix(chromeEnv, sceneReflection, 0.4) * uReflectionIntensity;
-    vec3 finalColor = uMetalColor * combinedReflection * fresnel;
-
-    // Adiciona realces especulares
-    finalColor += (specular + secondarySpec) * uSpecularColor;
-
-    // Micro-sombreamento nas dobras das ondas de mercúrio
-    float waveContrast = smoothstep(-0.25, 0.25, vDisplacement);
-    finalColor *= mix(0.86, 1.08, waveContrast);
-
-    gl_FragColor = vec4(finalColor, 1.0);
-  }
-`;
-""",
-
-    # -------------------------------------------------------------
-    # 4. js/scene.js
-    # -------------------------------------------------------------
-    "js/scene.js": """/**
- * Elementos de fundo vibrantes e de alto contraste gerados proceduralmente.
- */
-
-import * as THREE from 'three';
-
-function createProceduralGridTexture() {
-  const size = 1024;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-
-  const grad = ctx.createLinearGradient(0, 0, size, size);
-  grad.addColorStop(0, '#060814');
-  grad.addColorStop(1, '#0f172a');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, size, size);
-
-  const tileSize = 64;
-  for (let y = 0; y < size; y += tileSize) {
-    for (let x = 0; x < size; x += tileSize) {
-      if (((x / tileSize) + (y / tileSize)) % 2 === 0) {
-        ctx.fillStyle = 'rgba(30, 41, 59, 0.7)';
-        ctx.fillRect(x, y, tileSize, tileSize);
-      }
+"""
+
+# ==============================================================================
+# 3. js/shaders.js
+# ==============================================================================
+FILES["js/shaders.js"] = """// Repositório Central de Shaders em GLSL (Shader Playground)
+
+export const Shaders = {
+    // -------------------------------------------------------------------------
+    // 1. Vidro Refrativo (RGB Split / Aberração Cromática)
+    // -------------------------------------------------------------------------
+    glass: {
+        vertexShader: `
+            varying vec3 vNormalWorld;
+            varying vec3 vViewDirWorld;
+            varying vec3 vNormalView;
+            varying vec3 vViewDirView;
+
+            void main() {
+                vec4 worldPos = modelMatrix * vec4(position, 1.0);
+                vViewDirWorld = normalize(cameraPosition - worldPos.xyz);
+                vNormalWorld = normalize(mat3(modelMatrix) * normal);
+                
+                vec4 viewPos = modelViewMatrix * vec4(position, 1.0);
+                vViewDirView = normalize(-viewPos.xyz);
+                vNormalView = normalize(normalMatrix * normal);
+
+                gl_Position = projectionMatrix * viewPos;
+            }
+        `,
+        fragmentShader: `
+            uniform sampler2D uSceneTexture;
+            uniform vec2 uResolution;
+            uniform float uIor;
+            uniform float uDispersion;
+            uniform float uFresnelPower;
+            uniform float uRoughness;
+            uniform vec3 uTint;
+
+            varying vec3 vNormalWorld;
+            varying vec3 vViewDirWorld;
+            varying vec3 vNormalView;
+            varying vec3 vViewDirView;
+
+            void main() {
+                vec2 screenUV = gl_FragCoord.xy / uResolution.xy;
+                vec3 N = normalize(vNormalView);
+                vec3 V = normalize(vViewDirView);
+
+                float NdotV = max(dot(N, V), 0.0);
+                float f0 = pow((1.0 - uIor) / (1.0 + uIor), 2.0);
+                float fresnel = f0 + (1.0 - f0) * pow(1.0 - NdotV, uFresnelPower);
+
+                float etaR = 1.0 / (uIor - uDispersion);
+                float etaG = 1.0 / uIor;
+                float etaB = 1.0 / (uIor + uDispersion);
+
+                vec3 refrR = refract(-V, N, etaR);
+                vec3 refrG = refract(-V, N, etaG);
+                vec3 refrB = refract(-V, N, etaB);
+
+                vec2 uvR = screenUV + refrR.xy * (0.08 + uRoughness * 0.05);
+                vec2 uvG = screenUV + refrG.xy * (0.08 + uRoughness * 0.05);
+                vec2 uvB = screenUV + refrB.xy * (0.08 + uRoughness * 0.05);
+
+                float colR = texture2D(uSceneTexture, uvR).r;
+                float colG = texture2D(uSceneTexture, uvG).g;
+                float colB = texture2D(uSceneTexture, uvB).b;
+
+                vec3 refractedColor = vec3(colR, colG, colB) * uTint;
+
+                vec3 lightDir = normalize(vec3(0.5, 1.0, 0.8));
+                vec3 H = normalize(lightDir + V);
+                float spec = pow(max(dot(N, H), 0.0), 32.0 / max(uRoughness, 0.05));
+                vec3 specular = vec3(1.0) * spec * 0.8;
+
+                vec3 finalColor = mix(refractedColor, vec3(1.0), fresnel * 0.5) + specular;
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `
+    },
+
+    // -------------------------------------------------------------------------
+    // 2. Película Iridescente (Thin-Film / Bolha de Sabão)
+    // -------------------------------------------------------------------------
+    iridescent: {
+        vertexShader: `
+            varying vec3 vNormal;
+            varying vec3 vViewDir;
+            varying vec3 vWorldPosition;
+
+            void main() {
+                vec4 worldPos = modelMatrix * vec4(position, 1.0);
+                vWorldPosition = worldPos.xyz;
+                vNormal = normalize(mat3(modelMatrix) * normal);
+                vViewDir = normalize(cameraPosition - worldPos.xyz);
+                gl_Position = projectionMatrix * viewMatrix * worldPos;
+            }
+        `,
+        fragmentShader: `
+            uniform sampler2D uSceneTexture;
+            uniform vec2 uResolution;
+            uniform float uTime;
+            uniform float uFilmThickness;
+            uniform float uNoiseScale;
+            uniform float uIridescenceIntensity;
+            uniform float uOpacity;
+
+            varying vec3 vNormal;
+            varying vec3 vViewDir;
+            varying vec3 vWorldPosition;
+
+            vec3 cosinePalette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {
+                return a + b * cos(6.2831853 * (c * t + d));
+            }
+
+            void main() {
+                vec2 screenUV = gl_FragCoord.xy / uResolution.xy;
+                vec3 N = normalize(vNormal);
+                vec3 V = normalize(vViewDir);
+
+                float cosTheta = max(dot(N, V), 0.0);
+                float fresnel = pow(1.0 - cosTheta, 2.8);
+
+                float noise = sin(vWorldPosition.x * uNoiseScale + uTime * 0.7) *
+                              cos(vWorldPosition.y * uNoiseScale + uTime * 0.5) *
+                              sin(vWorldPosition.z * uNoiseScale + uTime * 0.6);
+
+                float opticalPath = uFilmThickness * (1.0 + noise * 0.25) / max(cosTheta, 0.15);
+                
+                vec3 a = vec3(0.5, 0.5, 0.5);
+                vec3 b = vec3(0.5, 0.5, 0.5);
+                vec3 c = vec3(1.0, 1.0, 1.0);
+                vec3 d = vec3(0.0, 0.33, 0.67);
+                vec3 iridColor = cosinePalette(opticalPath, a, b, c, d);
+
+                vec2 refrUV = screenUV + N.xy * 0.035;
+                vec3 bg = texture2D(uSceneTexture, refrUV).rgb;
+
+                vec3 mixedColor = mix(bg, iridColor, fresnel * uIridescenceIntensity);
+                gl_FragColor = vec4(mixedColor, uOpacity);
+            }
+        `
+    },
+
+    // -------------------------------------------------------------------------
+    // 3. Mercúrio Líquido Cromado (Vertex Displacement + Tangent Normal Recalc)
+    // -------------------------------------------------------------------------
+    mercury: {
+        vertexShader: `
+            uniform float uTime;
+            uniform float uNoiseScale;
+            uniform float uNoiseSpeed;
+            uniform float uDisplacement;
+
+            varying vec3 vNormalWorld;
+            varying vec3 vViewDirWorld;
+            varying vec3 vWorldPosition;
+
+            vec4 permute(vec4 x) { return mod(((x * 34.0) + 1.0) * x, 289.0); }
+            vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+
+            float snoise(vec3 v) {
+                const vec2 C = vec2(1.0 / 6.0, 1.0 / 3.0);
+                const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+
+                vec3 i  = floor(v + dot(v, C.yyy));
+                vec3 x0 = v - i + dot(i, C.xxx);
+
+                vec3 g = step(x0.yzx, x0.xyz);
+                vec3 l = 1.0 - g;
+                vec3 i1 = min(g.xyz, l.zxy);
+                vec3 i2 = max(g.xyz, l.zxy);
+
+                vec3 x1 = x0 - i1 + 1.0 * C.xxx;
+                vec3 x2 = x0 - i2 + 2.0 * C.xxx;
+                vec3 x3 = x0 - 1.0 + 3.0 * C.xxx;
+
+                i = mod(i, 289.0);
+                vec4 p = permute(permute(permute(
+                            i.z + vec4(0.0, i1.z, i2.z, 1.0))
+                        + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+                        + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+
+                float n_ = 0.142857142857;
+                vec3  ns = n_ * D.wyz - D.xzx;
+
+                vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+
+                vec4 x_ = floor(j * ns.z);
+                vec4 y_ = floor(j - 7.0 * x_);
+
+                vec4 x = x_ * ns.x + ns.yyyy;
+                vec4 y = y_ * ns.x + ns.yyyy;
+                vec4 h = 1.0 - abs(x) - abs(y);
+
+                vec4 b0 = vec4(x.xy, y.xy);
+                vec4 b1 = vec4(x.zw, y.zw);
+
+                vec4 s0 = floor(b0) * 2.0 + 1.0;
+                vec4 s1 = floor(b1) * 2.0 + 1.0;
+                vec4 sh = -step(h, vec4(0.0));
+
+                vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+                vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+
+                vec3 p0 = vec3(a0.xy, h.x);
+                vec3 p1 = vec3(a0.zw, h.y);
+                vec3 p2 = vec3(a1.xy, h.z);
+                vec3 p3 = vec3(a1.zw, h.w);
+
+                vec4 norm = taylorInvSqrt(vec4(dot(p0, p0), dot(p1, p1), dot(p2, p2), dot(p3, p3)));
+                p0 *= norm.x;
+                p1 *= norm.y;
+                p2 *= norm.z;
+                p3 *= norm.w;
+
+                vec4 m = max(0.6 - vec4(dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3)), 0.0);
+                m = m * m;
+                return 42.0 * dot(m * m, vec4(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
+            }
+
+            float getDisplacement(vec3 p) {
+                float n1 = snoise(p * uNoiseScale + vec3(0.0, uTime * uNoiseSpeed, 0.0));
+                float n2 = snoise(p * (uNoiseScale * 2.1) - vec3(uTime * uNoiseSpeed * 0.8, 0.0, 0.0)) * 0.5;
+                return (n1 + n2) * uDisplacement;
+            }
+
+            void main() {
+                float disp = getDisplacement(position);
+                vec3 displacedPos = position + normal * disp;
+
+                float eps = 0.01;
+                vec3 tangent = normalize(abs(normal.y) < 0.999 ? cross(normal, vec3(0.0, 1.0, 0.0)) : cross(normal, vec3(0.0, 0.0, 1.0)));
+                vec3 bitangent = cross(normal, tangent);
+
+                vec3 pT = position + tangent * eps;
+                vec3 pB = position + bitangent * eps;
+
+                pT += normal * getDisplacement(pT);
+                pB += normal * getDisplacement(pB);
+
+                vec3 newNormal = normalize(cross(pT - displacedPos, pB - displacedPos));
+
+                vec4 worldPos = modelMatrix * vec4(displacedPos, 1.0);
+                vWorldPosition = worldPos.xyz;
+                vNormalWorld = normalize(mat3(modelMatrix) * newNormal);
+                vViewDirWorld = normalize(cameraPosition - worldPos.xyz);
+
+                gl_Position = projectionMatrix * viewMatrix * worldPos;
+            }
+        `,
+        fragmentShader: `
+            uniform sampler2D uSceneTexture;
+            uniform vec2 uResolution;
+            uniform float uMetalness;
+
+            varying vec3 vNormalWorld;
+            varying vec3 vViewDirWorld;
+            varying vec3 vWorldPosition;
+
+            void main() {
+                vec3 N = normalize(vNormalWorld);
+                vec3 V = normalize(vViewDirWorld);
+                vec3 R = reflect(-V, N);
+
+                float chromeGradient = 0.5 + 0.5 * sin(R.y * 3.5 + 0.3);
+                vec3 studioSky = mix(vec3(0.05, 0.06, 0.09), vec3(0.85, 0.92, 1.0), chromeGradient);
+                
+                vec2 screenUV = gl_FragCoord.xy / uResolution.xy;
+                vec2 reflectUV = screenUV + R.xy * 0.22;
+                vec3 sceneReflect = texture2D(uSceneTexture, reflectUV).rgb;
+
+                float fresnel = 0.65 + 0.35 * pow(1.0 - max(dot(N, V), 0.0), 3.0);
+                vec3 chromeBase = mix(studioSky, sceneReflect, 0.45);
+
+                vec3 lightDir = normalize(vec3(0.4, 0.9, 0.6));
+                vec3 H = normalize(lightDir + V);
+                float spec = pow(max(dot(N, H), 0.0), 128.0) * 1.5;
+
+                vec3 finalColor = chromeBase * fresnel * uMetalness + vec3(spec);
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `
+    },
+
+    // -------------------------------------------------------------------------
+    // 4. Buraco Negro / Lente Gravitacional Cósmica (Gargantua Interstellar)
+    // -------------------------------------------------------------------------
+    blackhole: {
+        vertexShader: `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = vec4(position.xy, 0.0, 1.0);
+            }
+        `,
+        fragmentShader: `
+            uniform sampler2D uSceneTexture;
+            uniform vec2 uResolution;
+            uniform vec2 uCenterUV;
+            uniform float uTime;
+            uniform vec3 uCameraPosition;
+            uniform vec3 uBlackHolePosition;
+            uniform mat4 uInvViewMatrix;
+            uniform mat4 uInvProjectionMatrix;
+
+            uniform float uHorizonRadius;
+            uniform float uLensingStrength;
+            uniform float uPhotonRingIntensity;
+            uniform float uPhotonRingThickness;
+            uniform float uDiskInner;
+            uniform float uDiskOuter;
+            uniform float uDiskSpeed;
+            uniform float uDopplerStrength;
+            uniform vec3 uDiskColorCore;
+            uniform vec3 uDiskColorEdge;
+            uniform float uDispersion;
+            uniform float uSpin;
+
+            varying vec2 vUv;
+
+            // Ruído procedural para turbulência do disco de acreção
+            float hash(vec2 p) {
+                return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+            }
+
+            float noise(vec2 p) {
+                vec2 i = floor(p);
+                vec2 f = fract(p);
+                vec2 u = f * f * (3.0 - 2.0 * f);
+                return mix(mix(hash(i + vec2(0.0,0.0)), hash(i + vec2(1.0,0.0)), u.x),
+                           mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
+            }
+
+            float fbm(vec2 p) {
+                float v = 0.0;
+                float a = 0.5;
+                mat2 rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.5));
+                for (int i = 0; i < 4; ++i) {
+                    v += a * noise(p);
+                    p = rot * p * 2.0 + vec2(100.0);
+                    a *= 0.5;
+                }
+                return v;
+            }
+
+            void main() {
+                vec2 screenUV = gl_FragCoord.xy / uResolution.xy;
+                float aspect = uResolution.x / uResolution.y;
+
+                // Coordenadas radiais em relação ao centro do buraco negro na tela
+                vec2 toCenterScreen = screenUV - uCenterUV;
+                toCenterScreen.x *= aspect;
+                float distScreen = length(toCenterScreen);
+                vec2 dirScreen = distScreen > 0.0001 ? toCenterScreen / distScreen : vec2(0.0);
+
+                // Reconstrução do raio 3D em espaço de mundo (da câmera através do pixel)
+                vec2 ndc = screenUV * 2.0 - 1.0;
+                vec4 clip = vec4(ndc, -1.0, 1.0);
+                vec4 viewRay = uInvProjectionMatrix * clip;
+                viewRay = vec4(viewRay.xy, -1.0, 0.0);
+                vec3 rayDir = normalize((uInvViewMatrix * viewRay).xyz);
+                vec3 rayOrigin = uCameraPosition;
+
+                // Parâmetro de impacto b no espaço 3D (distância de aproximação máxima à singularidade)
+                vec3 toBH = uBlackHolePosition - rayOrigin;
+                float tClosest = dot(toBH, rayDir);
+                vec3 pClosest = rayOrigin + rayDir * max(0.0, tClosest);
+                float b = length(pClosest - uBlackHolePosition);
+
+                float rHorizon = uHorizonRadius;
+
+                // 1. Deflexão Gravitacional de Einstein (Lente gravitacional do fundo FBO)
+                // A deflexão decresce suavemente com a distância, sem corte abrupto de geometria!
+                float deflection = (uLensingStrength * 0.18) / (max(b - rHorizon * 0.95, 0.02) + 0.08);
+                float fadeOut = smoothstep(5.5, 0.8, distScreen);
+                vec2 uvOffset = dirScreen * deflection * fadeOut;
+
+                // Arrasto de referenciais Kerr (Swirl gravitacional de rotação)
+                vec2 swirl = vec2(-dirScreen.y, dirScreen.x) * (uSpin * 0.025 / (distScreen + 0.15)) * fadeOut;
+                uvOffset += swirl;
+
+                // Amostragem com aberração cromática contínua
+                vec2 uvR = clamp(screenUV - uvOffset * (1.0 + uDispersion), 0.0, 1.0);
+                vec2 uvG = clamp(screenUV - uvOffset, 0.0, 1.0);
+                vec2 uvB = clamp(screenUV - uvOffset * (1.0 - uDispersion), 0.0, 1.0);
+
+                vec3 bgCol = vec3(
+                    texture2D(uSceneTexture, uvR).r,
+                    texture2D(uSceneTexture, uvG).g,
+                    texture2D(uSceneTexture, uvB).b
+                );
+
+                // 2. Disco de Acreção Relativístico 3D (Equatorial e Lenteado)
+                vec3 diskNormal = normalize(vec3(0.18, 1.0, 0.12));
+                vec3 diskCol = vec3(0.0);
+
+                // Intersecção do raio com o plano do disco direto
+                float denom = dot(rayDir, diskNormal);
+                if (abs(denom) > 0.001) {
+                    float tDisk = dot(uBlackHolePosition - rayOrigin, diskNormal) / denom;
+                    if (tDisk > 0.0) {
+                        vec3 pDisk = rayOrigin + rayDir * tDisk;
+                        float rDisk = length(pDisk - uBlackHolePosition);
+                        
+                        // Oclusão pelo horizonte de eventos
+                        bool occluded = (tDisk > tClosest) && (b < rHorizon);
+                        if (rDisk >= uDiskInner && rDisk <= uDiskOuter && !occluded) {
+                            vec3 rVec = pDisk - uBlackHolePosition;
+                            vec3 uDisk = normalize(cross(diskNormal, vec3(0.0, 0.0, 1.0)));
+                            vec3 vDisk = cross(diskNormal, uDisk);
+                            float phi = atan(dot(rVec, vDisk), dot(rVec, uDisk));
+
+                            // Velocidade Kepleriana: omega propto 1 / sqrt(r)
+                            float rotSpeed = uDiskSpeed / sqrt(max(rDisk, 0.2));
+                            float phiRot = phi - uTime * rotSpeed;
+                            float turb = fbm(vec2(rDisk * 3.5 - uTime * 0.4, phiRot * 3.0));
+
+                            float rNorm = (rDisk - uDiskInner) / (uDiskOuter - uDiskInner);
+                            float density = smoothstep(0.0, 0.25, rNorm) * smoothstep(1.0, 0.55, rNorm);
+                            density *= (0.6 + 0.5 * turb);
+
+                            // Relativistic Doppler Beaming
+                            vec3 vRot = cross(diskNormal, rVec);
+                            float beta = dot(normalize(vRot), -rayDir);
+                            float doppler = pow(clamp(1.0 + beta * uDopplerStrength, 0.2, 2.8), 2.8);
+
+                            vec3 colGrad = mix(uDiskColorCore, uDiskColorEdge, pow(rNorm, 0.65));
+                            vec3 directLight = colGrad * doppler * density * 2.8;
+                            if (beta > 0.0) {
+                                directLight += vec3(0.1, 0.25, 0.5) * beta * doppler;
+                            }
+                            diskCol += directLight;
+                        }
+                    }
+                }
+
+                // 3. Duplo Arco Lenteado do Disco (Gargantua Halo Superior e Inferior)
+                float haloR = abs(b - rHorizon * 1.35);
+                float haloMask = exp(-pow(haloR / 0.38, 2.0));
+                if (haloMask > 0.01 && b >= rHorizon * 0.95) {
+                    vec3 haloGrad = mix(uDiskColorCore, uDiskColorEdge, 0.45);
+                    float haloAngle = atan(toCenterScreen.y, toCenterScreen.x);
+                    float haloNoise = fbm(vec2(b * 5.0, haloAngle * 4.0 - uTime * 0.8));
+                    
+                    // Doppler suave também no halo lenteado
+                    float haloDoppler = 1.0 + cos(haloAngle) * 0.4 * uDopplerStrength;
+                    diskCol += haloGrad * haloMask * (0.75 + 0.45 * haloNoise) * haloDoppler * 1.6;
+                }
+
+                // 4. Anel de Fótons de Einstein (Photon Sphere)
+                float photonDist = abs(b - rHorizon * 1.15);
+                float photonRing = exp(-pow(photonDist / max(uPhotonRingThickness, 0.005), 2.0)) * uPhotonRingIntensity;
+                vec3 photonColor = vec3(1.0, 0.96, 0.88) * photonRing;
+
+                // 5. Composição com o Horizonte de Eventos Schwarzschild
+                vec3 finalColor;
+                if (b < rHorizon) {
+                    // Singularidade: buraco negro puro (com oclusão da porção frontal do disco)
+                    finalColor = diskCol;
+                } else {
+                    finalColor = bgCol + diskCol + photonColor;
+                }
+
+                // Tone mapping Reinhard estendido para evitar saturação sólida branca
+                finalColor = finalColor / (finalColor + vec3(1.0));
+                finalColor = pow(finalColor, vec3(1.0 / 1.15));
+
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `
     }
-  }
+};
+"""
 
-  ctx.strokeStyle = 'rgba(6, 182, 212, 0.45)';
-  ctx.lineWidth = 2;
-  for (let i = 0; i <= size; i += 64) {
-    ctx.beginPath();
-    ctx.moveTo(i, 0); ctx.lineTo(i, size);
-    ctx.stroke();
+# ==============================================================================
+# 4. js/scene.js
+# ==============================================================================
+FILES["js/scene.js"] = """import * as THREE from 'three';
 
-    ctx.beginPath();
-    ctx.moveTo(0, i); ctx.lineTo(size, i);
-    ctx.stroke();
-  }
+export function setupBackgroundScene(scene) {
+    const bgGroup = new THREE.Group();
+    scene.add(bgGroup);
 
-  ctx.strokeStyle = 'rgba(244, 63, 94, 0.7)';
-  ctx.lineWidth = 5;
-  for (let r = 70; r <= 480; r += 90) {
-    ctx.beginPath();
-    ctx.arc(size / 2, size / 2, r, 0, Math.PI * 2);
-    ctx.stroke();
-  }
+    // 1. Grid Neon Infinito
+    const gridFloor = new THREE.GridHelper(80, 50, 0x00f3ff, 0x1e293b);
+    gridFloor.position.y = -6;
+    bgGroup.add(gridFloor);
 
-  ctx.strokeStyle = 'rgba(234, 179, 8, 0.4)';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(0, 0); ctx.lineTo(size, size);
-  ctx.moveTo(size, 0); ctx.lineTo(0, size);
-  ctx.stroke();
+    const gridCeil = new THREE.GridHelper(80, 50, 0xff007f, 0x1e293b);
+    gridCeil.position.y = 8;
+    bgGroup.add(gridCeil);
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(1.5, 1.5);
-  return texture;
-}
+    // 2. Anéis Orbitais Neon
+    const rings = [];
+    const ringConfigs = [
+        { radius: 11, tube: 0.04, color: 0x00f3ff, rotSpeed: 0.12, axis: new THREE.Vector3(1, 0.3, 0) },
+        { radius: 14, tube: 0.05, color: 0xff007f, rotSpeed: -0.15, axis: new THREE.Vector3(0.2, 1, 0.4) },
+        { radius: 17, tube: 0.06, color: 0xffe600, rotSpeed: 0.09, axis: new THREE.Vector3(0.5, 0.2, 1) }
+    ];
 
-export function setupBackground(scene) {
-  const animatedObjects = [];
-
-  const bgTexture = createProceduralGridTexture();
-  const bgPlaneGeo = new THREE.PlaneGeometry(32, 22);
-  const bgPlaneMat = new THREE.MeshBasicMaterial({ map: bgTexture });
-  const bgPlane = new THREE.Mesh(bgPlaneGeo, bgPlaneMat);
-  bgPlane.position.set(0, 0, -5.5);
-  scene.add(bgPlane);
-
-  const geometries = [
-    new THREE.BoxGeometry(0.85, 0.85, 0.85),
-    new THREE.SphereGeometry(0.55, 32, 32),
-    new THREE.IcosahedronGeometry(0.65, 0),
-    new THREE.TorusGeometry(0.55, 0.22, 16, 40),
-    new THREE.OctahedronGeometry(0.65, 0),
-    new THREE.ConeGeometry(0.55, 1.1, 32),
-  ];
-
-  const colors = [
-    0x00f0ff,
-    0xff0055,
-    0x39ff14,
-    0xffbe0b,
-    0x8338ec,
-    0xfb5607,
-  ];
-
-  const count = 14;
-  for (let i = 0; i < count; i++) {
-    const geo = geometries[i % geometries.length];
-    const color = colors[i % colors.length];
-
-    const mat = new THREE.MeshStandardMaterial({
-      color: color,
-      roughness: 0.2,
-      metalness: 0.8,
-      emissive: color,
-      emissiveIntensity: 0.35,
+    ringConfigs.forEach(cfg => {
+        const geom = new THREE.TorusGeometry(cfg.radius, cfg.tube, 16, 120);
+        const mat = new THREE.MeshBasicMaterial({ color: cfg.color });
+        const mesh = new THREE.Mesh(geom, mat);
+        bgGroup.add(mesh);
+        rings.push({ mesh, ...cfg });
     });
 
-    const mesh = new THREE.Mesh(geo, mat);
+    // 3. 14 Objetos Geométricos Animados Orbitando no Fundo
+    const orbiters = [];
+    const geometries = [
+        new THREE.BoxGeometry(1.2, 1.2, 1.2),
+        new THREE.OctahedronGeometry(1.0),
+        new THREE.TetrahedronGeometry(1.1),
+        new THREE.TorusGeometry(0.8, 0.3, 16, 32),
+        new THREE.IcosahedronGeometry(0.9),
+        new THREE.DodecahedronGeometry(0.95),
+        new THREE.ConeGeometry(0.8, 1.6, 16)
+    ];
 
-    const angle = (i / count) * Math.PI * 2;
-    const radius = 2.4 + (i % 3) * 0.7;
-    mesh.position.set(
-      Math.cos(angle) * radius,
-      Math.sin(angle) * radius,
-      -2.0 - (i % 4) * 0.7
-    );
+    const neonColors = [
+        0x00f3ff, 0xff007f, 0x39ff14, 0xffe600, 0xff5f00, 0xa855f7, 0x38bdf8
+    ];
 
-    mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-    scene.add(mesh);
+    for (let i = 0; i < 14; i++) {
+        const geom = geometries[i % geometries.length];
+        const color = neonColors[i % neonColors.length];
+        const mat = new THREE.MeshStandardMaterial({
+            color: color,
+            emissive: color,
+            emissiveIntensity: 0.7,
+            roughness: 0.2,
+            metalness: 0.8
+        });
 
-    animatedObjects.push({
-      mesh,
-      baseRadius: radius,
-      baseAngle: angle,
-      speed: 0.35 + (i % 4) * 0.15,
-      rotSpeedX: 0.015 * ((i % 2 === 0) ? 1 : -1),
-      rotSpeedY: 0.02 * ((i % 3 === 0) ? 1 : -1),
-      bobFreq: 1.5 + (i % 3),
-      bobAmp: 0.25,
-      zBase: mesh.position.z,
-    });
-  }
+        const mesh = new THREE.Mesh(geom, mat);
+        bgGroup.add(mesh);
 
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-  scene.add(ambientLight);
-
-  const mainLight = new THREE.DirectionalLight(0xffffff, 2.0);
-  mainLight.position.set(6, 8, 7);
-  scene.add(mainLight);
-
-  const fillLight = new THREE.DirectionalLight(0x38bdf8, 1.2);
-  fillLight.position.set(-6, -4, 4);
-  scene.add(fillLight);
-
-  const coloredPointLight = new THREE.PointLight(0xff007f, 3.0, 15);
-  coloredPointLight.position.set(0, 0, 1.5);
-  scene.add(coloredPointLight);
-
-  return {
-    animatedObjects,
-    coloredPointLight,
-    update: (time, speedMultiplier = 1.0) => {
-      animatedObjects.forEach((item) => {
-        const curAngle = item.baseAngle + time * item.speed * speedMultiplier;
-        item.mesh.position.x = Math.cos(curAngle) * item.baseRadius;
-        item.mesh.position.y = Math.sin(curAngle) * item.baseRadius + Math.sin(time * item.bobFreq) * item.bobAmp;
-        item.mesh.rotation.x += item.rotSpeedX * speedMultiplier;
-        item.mesh.rotation.y += item.rotSpeedY * speedMultiplier;
-      });
-
-      coloredPointLight.position.x = Math.sin(time * 0.8) * 3.0;
-      coloredPointLight.position.y = Math.cos(time * 0.6) * 2.5;
+        orbiters.push({
+            mesh: mesh,
+            orbitRadius: 6.5 + (i * 0.75),
+            orbitSpeed: (0.35 + (i * 0.05)) * (i % 2 === 0 ? 1 : -1),
+            angle: (i / 14) * Math.PI * 2,
+            heightOffset: Math.sin(i * 1.3) * 3.2,
+            heightSpeed: 1.2 + (i * 0.2),
+            rotSpeedX: 0.8 + Math.random() * 0.8,
+            rotSpeedY: 0.6 + Math.random() * 0.8
+        });
     }
-  };
+
+    // 4. Campo de Estrelas Procedural
+    const starCount = 1800;
+    const starGeometry = new THREE.BufferGeometry();
+    const starPositions = new Float32Array(starCount * 3);
+    const starColors = new Float32Array(starCount * 3);
+
+    const palette = [
+        new THREE.Color(0x00f3ff),
+        new THREE.Color(0xff007f),
+        new THREE.Color(0xffe600),
+        new THREE.Color(0xffffff),
+        new THREE.Color(0x7dd3fc)
+    ];
+
+    for (let i = 0; i < starCount; i++) {
+        const r = 20.0 + Math.random() * 40.0;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2.0 * Math.random() - 1.0);
+
+        starPositions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
+        starPositions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+        starPositions[i * 3 + 2] = r * Math.cos(phi);
+
+        const chosenCol = palette[Math.floor(Math.random() * palette.length)];
+        starColors[i * 3]     = chosenCol.r;
+        starColors[i * 3 + 1] = chosenCol.g;
+        starColors[i * 3 + 2] = chosenCol.b;
+    }
+
+    starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+
+    const starMaterial = new THREE.PointsMaterial({
+        size: 0.15,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.85
+    });
+
+    const starField = new THREE.Points(starGeometry, starMaterial);
+    bgGroup.add(starField);
+
+    // Iluminação
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    bgGroup.add(ambientLight);
+
+    const dirLight1 = new THREE.DirectionalLight(0x00f3ff, 1.2);
+    dirLight1.position.set(10, 15, 10);
+    bgGroup.add(dirLight1);
+
+    const dirLight2 = new THREE.DirectionalLight(0xff007f, 1.0);
+    dirLight2.position.set(-10, -10, -10);
+    bgGroup.add(dirLight2);
+
+    return {
+        group: bgGroup,
+        rings: rings,
+        orbiters: orbiters,
+        starField: starField
+    };
 }
-""",
 
-    # -------------------------------------------------------------
-    # 5. js/main.js
-    # -------------------------------------------------------------
-    "js/main.js": """/**
- * Main Entry Point: Shader Playground
- * Gerencia 3 Custom ShaderMaterials:
- * 1. Vidro Refrativo (RGB Split)
- * 2. Película Iridescente (Thin-Film)
- * 3. Mercúrio Líquido (Vertex Displacement + Simplex 3D Noise)
- */
+export function updateBackgroundScene(bgData, time, delta) {
+    bgData.rings.forEach(ring => {
+        ring.mesh.rotateOnAxis(ring.axis.clone().normalize(), ring.rotSpeed * delta);
+    });
 
-import * as THREE from 'three';
+    bgData.orbiters.forEach(item => {
+        item.angle += item.orbitSpeed * delta * 0.7;
+        const x = Math.cos(item.angle) * item.orbitRadius;
+        const z = Math.sin(item.angle) * item.orbitRadius;
+        const y = item.heightOffset + Math.sin(time * item.heightSpeed) * 1.2;
+
+        item.mesh.position.set(x, y, z);
+        item.mesh.rotation.x += item.rotSpeedX * delta;
+        item.mesh.rotation.y += item.rotSpeedY * delta;
+    });
+
+    if (bgData.starField) {
+        bgData.starField.rotation.y = time * 0.02;
+    }
+}
+"""
+
+# ==============================================================================
+# 5. js/main.js
+# ==============================================================================
+FILES["js/main.js"] = """import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import GUI from 'lil-gui';
-import {
-  glassVertexShader,
-  glassFragmentShader,
-  iridescentVertexShader,
-  iridescentFragmentShader,
-  liquidVertexShader,
-  liquidFragmentShader
-} from './shaders.js';
-import { setupBackground } from './scene.js';
+import { Shaders } from './shaders.js';
+import { setupBackgroundScene, updateBackgroundScene } from './scene.js';
 
-// --- Parâmetros de Estado e Interface ---
-const PARAMS = {
-  activeShader: 'Mercúrio Líquido (Cromado)',
-
-  // Parâmetros do Vidro Refrativo
-  glassRefractPower: 0.12,
-  glassAberration: 0.035,
-  glassFresnelIntensity: 1.1,
-  glassFresnelPower: 3.0,
-  glassFresnelColor: '#a5f3fc',
-  glassShininess: 48.0,
-
-  // Parâmetros da Película Iridescente
-  iridFrequency: 2.2,
-  iridNoiseScale: 0.45,
-  iridIntensity: 1.3,
-  iridTransparency: 0.85,
-  iridRefractPower: 0.08,
-  iridFresnelPower: 2.2,
-  iridShininess: 64.0,
-
-  // Parâmetros do Mercúrio Líquido Cromado
-  liquidWaveSpeed: 1.0,
-  liquidDisplacement: 0.16,
-  liquidFrequency: 0.85,
-  liquidReflection: 1.4,
-  liquidRoughness: 0.04,
-  liquidFresnelPower: 2.5,
-  liquidColor: '#e2e8f0',
-
-  // Configurações Gerais
-  geometry: 'Torus Knot',
-  autoRotate: true,
-  rotationSpeed: 1.0,
-  bgSpeed: 1.0,
-  zoomSmoothness: 0.08,
-};
-
-// --- Inicialização da Cena e Câmera ---
+// =============================================================================
+// SETUP DE CENA, RENDERER E CÂMERA
+// =============================================================================
 const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x060814);
+scene.background = new THREE.Color(0x050508);
 
-const camera = new THREE.PerspectiveCamera(
-  45,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  100
-);
-camera.position.set(0, 0, 4.6);
-
-// --- Renderizador com Tratamento Retina / DPI ---
-const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 150);
+camera.position.set(0, 2.5, 9.5);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(pixelRatio);
+const dpr = Math.min(window.devicePixelRatio, 2);
+renderer.setPixelRatio(dpr);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 1.1;
 container.appendChild(renderer.domElement);
 
-// --- OrbitControls com Zoom Desacoplado ---
+// =============================================================================
+// PIPELINE MULTI-PASS COM FBO E ALINHAMENTO DPI
+// =============================================================================
+let fboWidth = Math.floor(window.innerWidth * dpr);
+let fboHeight = Math.floor(window.innerHeight * dpr);
+
+const renderTarget = new THREE.WebGLRenderTarget(fboWidth, fboHeight, {
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+    format: THREE.RGBAFormat
+});
+
+const uResolutionVec = new THREE.Vector2(fboWidth, fboHeight);
+
+// Cenário de fundo procedural (zero texturas externas)
+const bgData = setupBackgroundScene(scene);
+
+// =============================================================================
+// PASSE FULLSCREEN EXCLUSIVO PARA O BURACO NEGRO (LENSING CONTÍNUO)
+// =============================================================================
+const postScene = new THREE.Scene();
+const postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+const blackHoleMaterial = new THREE.ShaderMaterial({
+    vertexShader: Shaders.blackhole.vertexShader,
+    fragmentShader: Shaders.blackhole.fragmentShader,
+    uniforms: {
+        uSceneTexture: { value: renderTarget.texture },
+        uResolution: { value: uResolutionVec },
+        uCenterUV: { value: new THREE.Vector2(0.5, 0.5) },
+        uTime: { value: 0.0 },
+        uCameraPosition: { value: camera.position },
+        uBlackHolePosition: { value: new THREE.Vector3(0, 0, 0) },
+        uInvViewMatrix: { value: new THREE.Matrix4() },
+        uInvProjectionMatrix: { value: new THREE.Matrix4() },
+
+        uHorizonRadius: { value: 0.85 },
+        uLensingStrength: { value: 0.55 },
+        uPhotonRingIntensity: { value: 3.2 },
+        uPhotonRingThickness: { value: 0.035 },
+        uDiskInner: { value: 1.25 },
+        uDiskOuter: { value: 3.6 },
+        uDiskSpeed: { value: 1.4 },
+        uDopplerStrength: { value: 0.8 },
+        uDiskColorCore: { value: new THREE.Color(0xffeed6) },
+        uDiskColorEdge: { value: new THREE.Color(0xff4d05) },
+        uDispersion: { value: 0.012 },
+        uSpin: { value: 0.25 }
+    },
+    depthTest: false,
+    depthWrite: false
+});
+
+const postQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), blackHoleMaterial);
+postScene.add(postQuad);
+
+// =============================================================================
+// MATERIAIS PARA MALHAS 3D (VIDRO, PELÍCULA, MERCÚRIO)
+// =============================================================================
+const materials = {
+    'Buraco Negro (Lensing)': blackHoleMaterial,
+
+    'Vidro Refrativo (RGB Split)': new THREE.ShaderMaterial({
+        vertexShader: Shaders.glass.vertexShader,
+        fragmentShader: Shaders.glass.fragmentShader,
+        uniforms: {
+            uSceneTexture: { value: renderTarget.texture },
+            uResolution: { value: uResolutionVec },
+            uIor: { value: 1.18 },
+            uDispersion: { value: 0.025 },
+            uFresnelPower: { value: 2.8 },
+            uRoughness: { value: 0.08 },
+            uTint: { value: new THREE.Color(0xffffff) }
+        },
+        transparent: false,
+        depthWrite: true
+    }),
+
+    'Película Iridescente': new THREE.ShaderMaterial({
+        vertexShader: Shaders.iridescent.vertexShader,
+        fragmentShader: Shaders.iridescent.fragmentShader,
+        uniforms: {
+            uSceneTexture: { value: renderTarget.texture },
+            uResolution: { value: uResolutionVec },
+            uTime: { value: 0.0 },
+            uFilmThickness: { value: 2.4 },
+            uNoiseScale: { value: 2.8 },
+            uIridescenceIntensity: { value: 1.0 },
+            uOpacity: { value: 0.88 }
+        },
+        transparent: true,
+        depthWrite: false
+    }),
+
+    'Mercúrio Líquido': new THREE.ShaderMaterial({
+        vertexShader: Shaders.mercury.vertexShader,
+        fragmentShader: Shaders.mercury.fragmentShader,
+        uniforms: {
+            uSceneTexture: { value: renderTarget.texture },
+            uResolution: { value: uResolutionVec },
+            uTime: { value: 0.0 },
+            uNoiseScale: { value: 1.4 },
+            uNoiseSpeed: { value: 0.75 },
+            uDisplacement: { value: 0.32 },
+            uMetalness: { value: 0.96 }
+        },
+        transparent: false,
+        depthWrite: true
+    })
+};
+
+// =============================================================================
+// MALHA CENTRAL E GEOMETRIAS (USADAS NOS SHADERS 3D)
+// =============================================================================
+const geometries = {
+    'Esfera': new THREE.SphereGeometry(2.0, 64, 64),
+    'Torus Knot': new THREE.TorusKnotGeometry(1.4, 0.45, 128, 32),
+    'Icosaedro': new THREE.IcosahedronGeometry(2.1, 4),
+    'Cilindro': new THREE.CylinderGeometry(1.6, 1.6, 3.2, 64, 16)
+};
+
+const state = {
+    shader: 'Buraco Negro (Lensing)',
+    geometry: 'Esfera',
+    autoRotateScene: true
+};
+
+const centralMesh = new THREE.Mesh(geometries[state.geometry], materials['Vidro Refrativo (RGB Split)']);
+centralMesh.position.set(0, 0, 0);
+scene.add(centralMesh);
+
+// =============================================================================
+// ZOOM CINEMÁTICO SUAVE (EXPONENTIAL LERP)
+// =============================================================================
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.dampingFactor = 0.05;
+controls.dampingFactor = 0.06;
 controls.enableZoom = false;
 
-// --- Sistema de Zoom Suave (Damped Lerp) ---
-const MIN_DISTANCE = 1.8;
-const MAX_DISTANCE = 8.5;
-let targetDistance = camera.position.distanceTo(controls.target);
-let currentDistance = targetDistance;
+let targetCameraDistance = camera.position.distanceTo(controls.target);
+const minDistance = 3.2;
+const maxDistance = 22.0;
 
 window.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  let delta = e.deltaY;
-  if (e.deltaMode === 1) delta *= 16;
-  else if (e.deltaMode === 2) delta *= 100;
-
-  const clampedDelta = Math.sign(delta) * Math.min(Math.abs(delta), 120);
-  const zoomStep = (clampedDelta / 100.0) * 0.065 * targetDistance;
-  targetDistance = THREE.MathUtils.clamp(targetDistance + zoomStep, MIN_DISTANCE, MAX_DISTANCE);
+    e.preventDefault();
+    const factor = 1.0 + Math.sign(e.deltaY) * 0.085;
+    targetCameraDistance = Math.max(minDistance, Math.min(maxDistance, targetCameraDistance * factor));
 }, { passive: false });
 
 let touchStartDist = 0;
-let touchStartTargetDist = targetDistance;
-
 window.addEventListener('touchstart', (e) => {
-  if (e.touches.length === 2) {
-    const dx = e.touches[0].pageX - e.touches[1].pageX;
-    const dy = e.touches[0].pageY - e.touches[1].pageY;
-    touchStartDist = Math.hypot(dx, dy);
-    touchStartTargetDist = targetDistance;
-  }
+    if (e.touches.length === 2) {
+        touchStartDist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+        );
+    }
 }, { passive: true });
 
 window.addEventListener('touchmove', (e) => {
-  if (e.touches.length === 2 && touchStartDist > 0) {
-    const dx = e.touches[0].pageX - e.touches[1].pageX;
-    const dy = e.touches[0].pageY - e.touches[1].pageY;
-    const dist = Math.hypot(dx, dy);
-    const factor = touchStartDist / dist;
-    targetDistance = THREE.MathUtils.clamp(touchStartTargetDist * factor, MIN_DISTANCE, MAX_DISTANCE);
-  }
+    if (e.touches.length === 2) {
+        const dist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+        );
+        const delta = touchStartDist - dist;
+        if (Math.abs(delta) > 2) {
+            const factor = 1.0 + (delta / 280.0);
+            targetCameraDistance = Math.max(minDistance, Math.min(maxDistance, targetCameraDistance * factor));
+            touchStartDist = dist;
+        }
+    }
 }, { passive: true });
 
-window.addEventListener('touchend', (e) => {
-  if (e.touches.length < 2) touchStartDist = 0;
-}, { passive: true });
-
-// --- WebGLRenderTarget (FBO Multi-Pass) dimensionado com DPI ---
-let fboWidth = Math.floor(window.innerWidth * pixelRatio);
-let fboHeight = Math.floor(window.innerHeight * pixelRatio);
-
-const renderTarget = new THREE.WebGLRenderTarget(fboWidth, fboHeight, {
-  minFilter: THREE.LinearFilter,
-  magFilter: THREE.LinearFilter,
-  format: THREE.RGBAFormat,
-  type: THREE.HalfFloatType,
-});
-
-// --- Fundo Procedural ---
-const bgController = setupBackground(scene);
-
-// --- Material 1: Vidro Refrativo ---
-const glassMaterial = new THREE.ShaderMaterial({
-  vertexShader: glassVertexShader,
-  fragmentShader: glassFragmentShader,
-  uniforms: {
-    uSceneTexture: { value: renderTarget.texture },
-    uResolution: { value: new THREE.Vector2(fboWidth, fboHeight) },
-    uRefractPower: { value: PARAMS.glassRefractPower },
-    uChromaticAberration: { value: PARAMS.glassAberration },
-    uFresnelIntensity: { value: PARAMS.glassFresnelIntensity },
-    uFresnelPower: { value: PARAMS.glassFresnelPower },
-    uFresnelColor: { value: new THREE.Color(PARAMS.glassFresnelColor) },
-    uLightPos: { value: new THREE.Vector3(5.0, 5.0, 5.0) },
-    uSpecularColor: { value: new THREE.Color(0xffffff) },
-    uShininess: { value: PARAMS.glassShininess }
-  },
-  side: THREE.DoubleSide,
-  transparent: false,
-});
-
-// --- Material 2: Película Iridescente ---
-const iridescentMaterial = new THREE.ShaderMaterial({
-  vertexShader: iridescentVertexShader,
-  fragmentShader: iridescentFragmentShader,
-  uniforms: {
-    uSceneTexture: { value: renderTarget.texture },
-    uResolution: { value: new THREE.Vector2(fboWidth, fboHeight) },
-    uTime: { value: 0.0 },
-    uRefractPower: { value: PARAMS.iridRefractPower },
-    uFrequency: { value: PARAMS.iridFrequency },
-    uNoiseScale: { value: PARAMS.iridNoiseScale },
-    uIridescenceIntensity: { value: PARAMS.iridIntensity },
-    uTransparency: { value: PARAMS.iridTransparency },
-    uFresnelPower: { value: PARAMS.iridFresnelPower },
-    uLightPos: { value: new THREE.Vector3(5.0, 5.0, 5.0) },
-    uSpecularColor: { value: new THREE.Color(0xffffff) },
-    uShininess: { value: PARAMS.iridShininess }
-  },
-  side: THREE.DoubleSide,
-  transparent: false,
-});
-
-// --- Material 3: Mercúrio Líquido Cromado (Vertex Displacement) ---
-const liquidMaterial = new THREE.ShaderMaterial({
-  vertexShader: liquidVertexShader,
-  fragmentShader: liquidFragmentShader,
-  uniforms: {
-    uSceneTexture: { value: renderTarget.texture },
-    uResolution: { value: new THREE.Vector2(fboWidth, fboHeight) },
-    uTime: { value: 0.0 },
-    uWaveSpeed: { value: PARAMS.liquidWaveSpeed },
-    uDisplacementScale: { value: PARAMS.liquidDisplacement },
-    uNoiseFrequency: { value: PARAMS.liquidFrequency },
-    uReflectionIntensity: { value: PARAMS.liquidReflection },
-    uRoughness: { value: PARAMS.liquidRoughness },
-    uFresnelPower: { value: PARAMS.liquidFresnelPower },
-    uMetalColor: { value: new THREE.Color(PARAMS.liquidColor) },
-    uLightPos: { value: new THREE.Vector3(5.0, 5.0, 5.0) },
-    uSpecularColor: { value: new THREE.Color(0xffffff) }
-  },
-  side: THREE.DoubleSide,
-  transparent: false,
-});
-
-// --- Geometrias com Subdivisão Otimizada para Deformação Fluida ---
-function buildGeometry(type) {
-  switch (type) {
-    case 'Torus Knot':
-      return new THREE.TorusKnotGeometry(1.0, 0.35, 180, 56);
-    case 'Esfera':
-      return new THREE.SphereGeometry(1.3, 80, 80);
-    case 'Icosaedro':
-      return new THREE.IcosahedronGeometry(1.35, 4);
-    case 'Toro':
-      return new THREE.TorusGeometry(1.15, 0.45, 48, 100);
-    case 'Octaedro':
-      return new THREE.OctahedronGeometry(1.4, 3);
-    default:
-      return new THREE.TorusKnotGeometry(1.0, 0.35, 180, 56);
-  }
-}
-
-// Inicia com o material ativo
-let currentMaterialInstance = liquidMaterial;
-if (PARAMS.activeShader.includes('Vidro')) currentMaterialInstance = glassMaterial;
-else if (PARAMS.activeShader.includes('Iridescente')) currentMaterialInstance = iridescentMaterial;
-
-const glassMesh = new THREE.Mesh(buildGeometry(PARAMS.geometry), currentMaterialInstance);
-scene.add(glassMesh);
-
-// --- Resize Listener ---
-window.addEventListener('resize', () => {
-  const width = window.innerWidth;
-  const height = window.innerHeight;
-  const pr = Math.min(window.devicePixelRatio || 1, 2);
-
-  camera.aspect = width / height;
-  camera.updateProjectionMatrix();
-
-  renderer.setPixelRatio(pr);
-  renderer.setSize(width, height);
-
-  fboWidth = Math.floor(width * pr);
-  fboHeight = Math.floor(height * pr);
-
-  renderTarget.setSize(fboWidth, fboHeight);
-  glassMaterial.uniforms.uResolution.value.set(fboWidth, fboHeight);
-  iridescentMaterial.uniforms.uResolution.value.set(fboWidth, fboHeight);
-  liquidMaterial.uniforms.uResolution.value.set(fboWidth, fboHeight);
-});
-
-// --- Interface lil-gui Interativa com Pastas Reativas ---
+// =============================================================================
+// INTERFACE LIL-GUI DINÂMICA
+// =============================================================================
 const gui = new GUI({ title: 'Shader Playground' });
 
-// Seletor Principal de Shader
-gui.add(PARAMS, 'activeShader', [
-  'Mercúrio Líquido (Cromado)',
-  'Vidro Refrativo (RGB Split)',
-  'Película Iridescente (Bolha)'
-])
-  .name('✨ Shader Ativo')
-  .onChange(type => {
-    updateActiveShader(type);
-  });
+const shaderCtrl = gui.add(state, 'shader', Object.keys(materials)).name('Shader Ativo').onChange(val => {
+    if (val !== 'Buraco Negro (Lensing)') {
+        centralMesh.material = materials[val];
+    }
+    updateGuiFolders(val);
+    updateHudInfo(val);
+});
 
-// Pasta: Mercúrio Líquido Cromado
-const fLiquid = gui.addFolder('Propriedades: Mercúrio Cromado');
-fLiquid.add(PARAMS, 'liquidDisplacement', 0.0, 0.45, 0.01).name('Altura das Ondas')
-  .onChange(v => { liquidMaterial.uniforms.uDisplacementScale.value = v; });
-fLiquid.add(PARAMS, 'liquidWaveSpeed', 0.1, 3.0, 0.1).name('Velocidade das Ondas')
-  .onChange(v => { liquidMaterial.uniforms.uWaveSpeed.value = v; });
-fLiquid.add(PARAMS, 'liquidFrequency', 0.2, 2.5, 0.05).name('Frequência do Ruído')
-  .onChange(v => { liquidMaterial.uniforms.uNoiseFrequency.value = v; });
-fLiquid.add(PARAMS, 'liquidReflection', 0.5, 3.0, 0.1).name('Brilho Cromado')
-  .onChange(v => { liquidMaterial.uniforms.uReflectionIntensity.value = v; });
-fLiquid.add(PARAMS, 'liquidRoughness', 0.0, 0.5, 0.01).name('Rugosidade')
-  .onChange(v => { liquidMaterial.uniforms.uRoughness.value = v; });
-fLiquid.addColor(PARAMS, 'liquidColor').name('Cor do Metal')
-  .onChange(v => { liquidMaterial.uniforms.uMetalColor.value.set(v); });
+const geomCtrl = gui.add(state, 'geometry', Object.keys(geometries)).name('Geometria 3D').onChange(val => {
+    centralMesh.geometry = geometries[val];
+});
 
-// Pasta: Vidro Refrativo
-const fGlass = gui.addFolder('Propriedades: Vidro Refrativo');
-fGlass.add(PARAMS, 'glassRefractPower', 0.0, 0.35, 0.005).name('Poder de Refração')
-  .onChange(v => { glassMaterial.uniforms.uRefractPower.value = v; });
-fGlass.add(PARAMS, 'glassAberration', 0.0, 0.1, 0.002).name('RGB Split (Dispersão)')
-  .onChange(v => { glassMaterial.uniforms.uChromaticAberration.value = v; });
-fGlass.add(PARAMS, 'glassFresnelIntensity', 0.0, 3.0, 0.1).name('Intensidade Fresnel')
-  .onChange(v => { glassMaterial.uniforms.uFresnelIntensity.value = v; });
-fGlass.add(PARAMS, 'glassFresnelPower', 1.0, 6.0, 0.1).name('Exponente Fresnel')
-  .onChange(v => { glassMaterial.uniforms.uFresnelPower.value = v; });
-fGlass.addColor(PARAMS, 'glassFresnelColor').name('Cor Fresnel')
-  .onChange(v => { glassMaterial.uniforms.uFresnelColor.value.set(v); });
-fGlass.add(PARAMS, 'glassShininess', 8.0, 128.0, 2.0).name('Especularidade')
-  .onChange(v => { glassMaterial.uniforms.uShininess.value = v; });
+gui.add(state, 'autoRotateScene').name('Girar Fundo');
 
-// Pasta: Película Iridescente
-const fIrid = gui.addFolder('Propriedades: Película Iridescente');
-fIrid.add(PARAMS, 'iridIntensity', 0.0, 3.0, 0.05).name('Brilho do Arco-íris')
-  .onChange(v => { iridescentMaterial.uniforms.uIridescenceIntensity.value = v; });
-fIrid.add(PARAMS, 'iridFrequency', 0.5, 6.0, 0.1).name('Densidade de Cores')
-  .onChange(v => { iridescentMaterial.uniforms.uFrequency.value = v; });
-fIrid.add(PARAMS, 'iridNoiseScale', 0.0, 1.5, 0.05).name('Ondulação Líquida')
-  .onChange(v => { iridescentMaterial.uniforms.uNoiseScale.value = v; });
-fIrid.add(PARAMS, 'iridTransparency', 0.0, 1.0, 0.02).name('Transparência do Sabão')
-  .onChange(v => { iridescentMaterial.uniforms.uTransparency.value = v; });
-fIrid.add(PARAMS, 'iridRefractPower', 0.0, 0.25, 0.005).name('Distorção de Fundo')
-  .onChange(v => { iridescentMaterial.uniforms.uRefractPower.value = v; });
-fIrid.add(PARAMS, 'iridFresnelPower', 1.0, 5.0, 0.1).name('Aro de Borda (Fresnel)')
-  .onChange(v => { iridescentMaterial.uniforms.uFresnelPower.value = v; });
-fIrid.add(PARAMS, 'iridShininess', 8.0, 128.0, 2.0).name('Polimento Especular')
-  .onChange(v => { iridescentMaterial.uniforms.uShininess.value = v; });
+// Pastas para cada shader
+const folderBlackHole = gui.addFolder('Buraco Negro');
+const bhUniforms = blackHoleMaterial.uniforms;
+folderBlackHole.add(bhUniforms.uHorizonRadius, 'value', 0.4, 1.6, 0.01).name('Raio Horizonte (Rs)');
+folderBlackHole.add(bhUniforms.uLensingStrength, 'value', 0.1, 1.5, 0.01).name('Força Lente');
+folderBlackHole.add(bhUniforms.uPhotonRingIntensity, 'value', 0.5, 6.0, 0.1).name('Brilho Anel Fótons');
+folderBlackHole.add(bhUniforms.uPhotonRingThickness, 'value', 0.005, 0.08, 0.005).name('Espessura Fótons');
+folderBlackHole.add(bhUniforms.uDiskInner, 'value', 0.9, 2.2, 0.01).name('Disco ISCO (Raio In)');
+folderBlackHole.add(bhUniforms.uDiskOuter, 'value', 2.0, 5.0, 0.05).name('Disco (Raio Out)');
+folderBlackHole.add(bhUniforms.uDiskSpeed, 'value', 0.0, 4.0, 0.1).name('Velocidade Kepler');
+folderBlackHole.add(bhUniforms.uDopplerStrength, 'value', 0.0, 1.5, 0.05).name('Doppler Beaming');
+folderBlackHole.addColor({ color: '#ffeed6' }, 'color').name('Cor Núcleo').onChange(c => bhUniforms.uDiskColorCore.value.set(c));
+folderBlackHole.addColor({ color: '#ff4d05' }, 'color').name('Cor Borda').onChange(c => bhUniforms.uDiskColorEdge.value.set(c));
+folderBlackHole.add(bhUniforms.uSpin, 'value', 0.0, 0.8, 0.01).name('Kerr Spin (Arrasto)');
+folderBlackHole.add(bhUniforms.uDispersion, 'value', 0.0, 0.04, 0.001).name('Dispersão Cromática');
 
-// Pasta: Configurações da Cena
-const fScene = gui.addFolder('Cena & Interação');
-fScene.add(PARAMS, 'geometry', ['Torus Knot', 'Esfera', 'Icosaedro', 'Toro', 'Octaedro'])
-  .name('Forma do Objeto')
-  .onChange(type => {
-    glassMesh.geometry.dispose();
-    glassMesh.geometry = buildGeometry(type);
-  });
-fScene.add(PARAMS, 'zoomSmoothness', 0.02, 0.20, 0.01).name('Suavidade do Zoom');
-fScene.add(PARAMS, 'autoRotate').name('Girar Objeto');
-fScene.add(PARAMS, 'rotationSpeed', 0.1, 3.0, 0.1).name('Vel. Rotação');
-fScene.add(PARAMS, 'bgSpeed', 0.0, 3.0, 0.1).name('Vel. Fundo');
+const folderGlass = gui.addFolder('Vidro Refrativo');
+const gUniforms = materials['Vidro Refrativo (RGB Split)'].uniforms;
+folderGlass.add(gUniforms.uIor, 'value', 1.0, 2.5, 0.01).name('Índice Refr. (IOR)');
+folderGlass.add(gUniforms.uDispersion, 'value', 0.0, 0.08, 0.002).name('RGB Split');
+folderGlass.add(gUniforms.uFresnelPower, 'value', 0.5, 5.0, 0.1).name('Força Fresnel');
+folderGlass.add(gUniforms.uRoughness, 'value', 0.0, 0.5, 0.01).name('Rugosidade');
+folderGlass.addColor({ color: '#ffffff' }, 'color').name('Tonalidade').onChange(c => gUniforms.uTint.value.set(c));
 
-function toggleFolderVisibility(folder, isVisible) {
-  if (typeof folder.show === 'function' && typeof folder.hide === 'function') {
-    isVisible ? folder.show() : folder.hide();
-  } else if (folder.domElement) {
-    folder.domElement.style.display = isVisible ? '' : 'none';
-  }
+const folderIridescent = gui.addFolder('Película Iridescente');
+const iUniforms = materials['Película Iridescente'].uniforms;
+folderIridescent.add(iUniforms.uFilmThickness, 'value', 0.5, 6.0, 0.1).name('Espessura Filme');
+folderIridescent.add(iUniforms.uNoiseScale, 'value', 0.5, 8.0, 0.1).name('Escala de Ondas');
+folderIridescent.add(iUniforms.uIridescenceIntensity, 'value', 0.1, 2.0, 0.05).name('Intensidade Cor');
+folderIridescent.add(iUniforms.uOpacity, 'value', 0.1, 1.0, 0.02).name('Opacidade');
+
+const folderMercury = gui.addFolder('Mercúrio Líquido');
+const mUniforms = materials['Mercúrio Líquido'].uniforms;
+folderMercury.add(mUniforms.uNoiseScale, 'value', 0.2, 4.0, 0.1).name('Escala Turbulência');
+folderMercury.add(mUniforms.uNoiseSpeed, 'value', 0.1, 2.5, 0.05).name('Velocidade Fluido');
+folderMercury.add(mUniforms.uDisplacement, 'value', 0.0, 0.8, 0.02).name('Altura Deformação');
+folderMercury.add(mUniforms.uMetalness, 'value', 0.5, 1.0, 0.02).name('Metalicidade');
+
+function updateGuiFolders(activeShader) {
+    const isBH = activeShader === 'Buraco Negro (Lensing)';
+    folderBlackHole.show(isBH);
+    folderGlass.show(activeShader === 'Vidro Refrativo (RGB Split)');
+    folderIridescent.show(activeShader === 'Película Iridescente');
+    folderMercury.show(activeShader === 'Mercúrio Líquido');
+
+    // A singularidade cósmica não usa geometria poligonal fechada
+    if (isBH) {
+        geomCtrl.hide();
+        folderBlackHole.open();
+    } else {
+        geomCtrl.show();
+        if (activeShader === 'Vidro Refrativo (RGB Split)') folderGlass.open();
+        if (activeShader === 'Película Iridescente') folderIridescent.open();
+        if (activeShader === 'Mercúrio Líquido') folderMercury.open();
+    }
 }
 
-function updateActiveShader(type) {
-  if (type.includes('Vidro')) {
-    glassMesh.material = glassMaterial;
-    glassMesh.material.needsUpdate = true;
-    toggleFolderVisibility(fGlass, true);
-    toggleFolderVisibility(fIrid, false);
-    toggleFolderVisibility(fLiquid, false);
-  } else if (type.includes('Iridescente')) {
-    glassMesh.material = iridescentMaterial;
-    glassMesh.material.needsUpdate = true;
-    toggleFolderVisibility(fGlass, false);
-    toggleFolderVisibility(fIrid, true);
-    toggleFolderVisibility(fLiquid, false);
-  } else {
-    glassMesh.material = liquidMaterial;
-    glassMesh.material.needsUpdate = true;
-    toggleFolderVisibility(fGlass, false);
-    toggleFolderVisibility(fIrid, false);
-    toggleFolderVisibility(fLiquid, true);
-  }
+function updateHudInfo(shaderName) {
+    const titleEl = document.getElementById('hud-active-shader');
+    const descEl = document.getElementById('hud-description');
+
+    const descriptions = {
+        'Buraco Negro (Lensing)': 'Lente gravitacional einsteiniana contínua com horizonte de Schwarzschild, disco de acreção 3D com rotação Kepleriana, efeito Doppler relativístico e duplo arco de auréola.',
+        'Vidro Refrativo (RGB Split)': 'Refração vetorial baseada na normal de visão, 3 amostragens na textura do FBO com offsets espectrais para separação de canais R, G e B, Fresnel e Blinn-Phong.',
+        'Película Iridescente': 'Gradiente de cores baseado na fórmula de cossenos de Inigo Quilez, deformação ondulatória na espessura do filme via ruído procedural, Fresnel e transmissão FBO.',
+        'Mercúrio Líquido': 'Deformação orgânica da malha direto no Vertex Shader com Simplex 3D Noise multi-oitavas, recálculo analítico de normais no espaço tangente por diferenças finitas e reflexo cromado.'
+    };
+
+    if (titleEl) titleEl.textContent = shaderName;
+    if (descEl) descEl.textContent = descriptions[shaderName] || '';
 }
 
-// Configura o estado visual inicial das pastas
-updateActiveShader(PARAMS.activeShader);
-fScene.open();
+updateGuiFolders(state.shader);
 
-// --- Loop de Renderização Multi-Pass ---
+// =============================================================================
+// REDIMENSIONAMENTO E PREVENÇÃO DE BUGS DPI
+// =============================================================================
+window.addEventListener('resize', () => {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const currentDpr = Math.min(window.devicePixelRatio, 2);
+
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(w, h);
+    renderer.setPixelRatio(currentDpr);
+
+    const fW = Math.floor(w * currentDpr);
+    const fH = Math.floor(h * currentDpr);
+    renderTarget.setSize(fW, fH);
+
+    uResolutionVec.set(fW, fH);
+});
+
+// =============================================================================
+// LOOP MULTI-PASS COM FBO (60 FPS)
+// =============================================================================
 const clock = new THREE.Clock();
 
 function animate() {
-  requestAnimationFrame(animate);
+    requestAnimationFrame(animate);
 
-  const delta = clock.getDelta();
-  const elapsedTime = clock.getElapsedTime();
+    const delta = clock.getDelta();
+    const elapsedTime = clock.getElapsedTime();
 
-  // 1. Atualizar animações de fundo e ponto de luz
-  bgController.update(elapsedTime, PARAMS.bgSpeed);
+    if (state.autoRotateScene) {
+        updateBackgroundScene(bgData, elapsedTime, delta);
+    }
 
-  // 2. Rotação do objeto
-  if (PARAMS.autoRotate) {
-    glassMesh.rotation.x += 0.006 * PARAMS.rotationSpeed;
-    glassMesh.rotation.y += 0.010 * PARAMS.rotationSpeed;
-  }
+    // Zoom Cinemático (Lerp contínuo)
+    const currentDist = camera.position.distanceTo(controls.target);
+    if (Math.abs(currentDist - targetCameraDistance) > 0.001) {
+        const newDist = THREE.MathUtils.lerp(currentDist, targetCameraDistance, 0.08);
+        const dir = camera.position.clone().sub(controls.target).normalize();
+        camera.position.copy(controls.target).addScaledVector(dir, newDist);
+    }
+    controls.update();
 
-  // 3. Zoom Suave interpolado
-  currentDistance = THREE.MathUtils.lerp(currentDistance, targetDistance, PARAMS.zoomSmoothness);
-  const camOffset = new THREE.Vector3().subVectors(camera.position, controls.target);
-  if (camOffset.lengthSq() > 0.0001) {
-    camOffset.normalize().multiplyScalar(currentDistance);
-    camera.position.copy(controls.target).add(camOffset);
-  }
-  controls.update();
+    camera.updateMatrixWorld();
 
-  // 4. Atualizar uniforms dinâmicas
-  const lightPos = bgController.coloredPointLight.position;
-  glassMaterial.uniforms.uLightPos.value.copy(lightPos);
-  iridescentMaterial.uniforms.uLightPos.value.copy(lightPos);
-  liquidMaterial.uniforms.uLightPos.value.copy(lightPos);
+    const isBH = state.shader === 'Buraco Negro (Lensing)';
 
-  iridescentMaterial.uniforms.uTime.value = elapsedTime;
-  liquidMaterial.uniforms.uTime.value = elapsedTime;
+    // =========================================================================
+    // PASSO 1: Captura a cena de fundo completa no FBO
+    // =========================================================================
+    centralMesh.visible = false;
+    renderer.setRenderTarget(renderTarget);
+    renderer.render(scene, camera);
 
-  // ==========================================================
-  // PASSO 1 DO FBO: Renderizar fundo no RenderTarget
-  // ==========================================================
-  glassMesh.visible = false;
-  renderer.setRenderTarget(renderTarget);
-  renderer.render(scene, camera);
+    // =========================================================================
+    // PASSO 2: Renderização final com Shader Ativo
+    // =========================================================================
+    renderer.setRenderTarget(null);
 
-  // ==========================================================
-  // PASSO 2: Renderizar cena completa no Canvas
-  // ==========================================================
-  renderer.setRenderTarget(null);
-  glassMesh.visible = true;
-  renderer.render(scene, camera);
+    if (isBH) {
+        // Buraco Negro Cósmico: Passe Fullscreen contínuo
+        bhUniforms.uTime.value = elapsedTime;
+        bhUniforms.uCameraPosition.value.copy(camera.position);
+
+        // Projeção exata do centro da singularidade na tela
+        const projected = new THREE.Vector3(0, 0, 0).project(camera);
+        bhUniforms.uCenterUV.value.set(
+            projected.x * 0.5 + 0.5,
+            projected.y * 0.5 + 0.5
+        );
+
+        // Matrizes inversas para reconstrução do raio de visão de cada pixel
+        bhUniforms.uInvViewMatrix.value.copy(camera.matrixWorld);
+        bhUniforms.uInvProjectionMatrix.value.copy(camera.projectionMatrixInverse);
+
+        renderer.render(postScene, postCamera);
+    } else {
+        // Shaders de Malha 3D (Vidro, Película, Mercúrio)
+        centralMesh.visible = true;
+
+        const activeMat = materials[state.shader];
+        if (activeMat && activeMat.uniforms) {
+            if (activeMat.uniforms.uTime) activeMat.uniforms.uTime.value = elapsedTime;
+        }
+
+        centralMesh.rotation.y = elapsedTime * 0.25;
+        centralMesh.rotation.x = Math.sin(elapsedTime * 0.2) * 0.15;
+
+        renderer.render(scene, camera);
+    }
 }
 
-// Início do Loop
 animate();
 """
-}
 
-def main():
-    print("=" * 70)
-    print("  Corrigindo: Three.js Shader Playground (Mercúrio Líquido)")
-    print("=" * 70)
+# ==============================================================================
+# EXECUÇÃO DO SCRIPT DE GERAÇÃO
+# ==============================================================================
+print("=" * 60)
+print("🚀 GERANDO ESTRUTURA COMPLETA DO SHADER PLAYGROUND")
+print("=" * 60)
 
-    base_dir = Path(".")
+for filepath, content in FILES.items():
+    p = Path(filepath)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(content, encoding="utf-8")
+    print(f"  [✔] {filepath}")
 
-    for rel_path, content in FILES.items():
-        file_path = base_dir / rel_path
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(content)
-        print(f" [✔] Arquivo atualizado: {file_path}")
-
-    print("\n" + "=" * 70)
-    print("  CORREÇÃO APLICADA COM SUCESSO!")
-    print("=" * 70)
-    print("  Como testar:")
-    print("  1. Recarregue a página no navegador (F5 ou Ctrl+R).")
-    print("  2. O Mercúrio Líquido Ondulante aparecerá imediatamente no centro!")
-    print("=" * 70)
-
-if __name__ == "__main__":
-    main()
+print("=" * 60)
+print("✨ Projeto configurado com sucesso!")
+print("🌐 Para rodar localmente:")
+print("   python -m http.server 3000")
+print("=" * 60)
